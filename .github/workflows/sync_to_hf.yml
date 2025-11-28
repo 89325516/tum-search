@@ -23,5 +23,19 @@ jobs:
           HF_USERNAME: "YuanhaoChen" 
           HF_SPACE_NAME: "SmartPagerankSearch"
         run: |
+          # 配置 git 用户
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          
+          # 强制创建一个全新的 orphan 分支，不包含任何历史记录
+          git checkout --orphan hf-sync-branch
+          
+          # Remove any potential binary files that might have been checked out or generated
+          rm -f visual_rank_engine.so
+          find . -name "*.so" -type f -delete
+          rm -rf visual_rank_engine/target
+
+          git add .
+          git commit -m "Sync from GitHub Actions (Clean Commit)"
           git remote add space https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$HF_SPACE_NAME
-          git push --force space main
+          git push --force space hf-sync-branch:main
