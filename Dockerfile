@@ -37,6 +37,15 @@ RUN mkdir -p temp_uploads static mock_data
 # 9. 暴露端口 (Hugging Face 默认监听 7860)
 EXPOSE 7860
 
-# 10. 启动命令
+# 10. 创建非 root 用户 (Hugging Face Spaces 安全要求)
+RUN useradd -m -u 1000 user
+
+# 11. 设置目录权限
+RUN chown -R user:user /app
+
+# 12. 切换到非 root 用户
+USER user
+
+# 13. 启动命令
 # 注意：Hugging Face 要求监听 7860 端口
 CMD ["uvicorn", "web_server:app", "--host", "0.0.0.0", "--port", "7860"]

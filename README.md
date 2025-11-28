@@ -1,3 +1,12 @@
+---
+title: PageRank Search
+emoji: 🔍
+colorFrom: blue
+colorTo: indigo
+sdk: docker
+app_port: 7860
+---
+
 # TUM Search Engine & Knowledge Graph
 
 A specialized search engine and knowledge graph system for the Technical University of Munich (TUM).
