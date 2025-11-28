@@ -1,0 +1,8 @@
+# 前端构建产物（如果有的话）
+dist/
+build/
+*.log
+
+# 依赖（如果将来添加）
+node_modules/
+

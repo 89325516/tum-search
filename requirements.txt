@@ -8,6 +8,9 @@ pillow
 numpy
 requests
 beautifulsoup4
+lxml
+aiohttp
+fake-useragent
 maturin
 python-dotenv
 google-generativeai
