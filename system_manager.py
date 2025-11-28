@@ -1,0 +1,605 @@
+import numpy as np
+import uuid
+import time
+import random
+from qdrant_client import QdrantClient
+from qdrant_client.http import models
+import google.generativeai as genai
+from transformers import CLIPProcessor, CLIPModel
+from PIL import Image
+from crawler import SmartCrawler  # 确保 crawler.py 在同级目录下
+
+# ================= 配置区 =================
+# 🔴 你的真实配置
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# 修改前：
+# QDRANT_URL = "https://..."
+# QDRANT_API_KEY = "ey..."
+
+# 修改后：
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
+
+# Configure Gemini
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
+else:
+    print("⚠️ GOOGLE_API_KEY not found in .env. Summarization will be disabled.")
+
+SPACE_R = "tum_space_r"
+SPACE_X = "tum_space_x"
+
+# 阈值设定
+NOVELTY_THRESHOLD = 0.2  # 距离大于 0.2 (相似度 < 0.8) 视为独特，自动晋升
+# =========================================
+
+print("系统初始化: 连接数据库 & 加载模型...")
+client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
+clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
+clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
+crawler = SmartCrawler()
+from interaction_manager import InteractionManager
+
+def get_embedding(text=None, image_path=None):
+    inputs = None
+    if text:
+        inputs = clip_processor(text=[text], return_tensors="pt", padding=True, truncation=True, max_length=77)
+        feat = clip_model.get_text_features(**inputs)
+    elif image_path:
+        try:
+            # 如果是URL图片，需要先下载，这里简化为兼容本地路径
+            image = Image.open(image_path).convert("RGB")
+            inputs = clip_processor(images=image, return_tensors="pt")
+            feat = clip_model.get_image_features(**inputs)
+        except Exception as e:
+            return None
+    if inputs is not None:
+        feat = feat / feat.norm(p=2, dim=-1, keepdim=True)
+        return feat[0].detach().numpy().tolist()
+    return None
+
+
+class SystemManager:
+    def __init__(self):
+        self.client = client
+        self.r_cache = []
+        self.r_ranks = {}
+        # HNSW 立体结构参数
+        self.max_level = 3
+        self.m_neighbors = 5
+        self.interaction_mgr = InteractionManager()
+        self.crawler = crawler
+        
+        # Initialize Gemini Model
+        print("🧠 Initializing Gemini API...")
+        self.model = genai.GenerativeModel('gemini-pro')
+        
+        self._init_collections()
+        self._ensure_indices()
+
+    def _init_collections(self):
+        """初始化 Qdrant 集合"""
+        for name in [SPACE_X, SPACE_R]:
+            if not self.client.collection_exists(name):
+                self.client.create_collection(
+                    collection_name=name,
+                    vectors_config={
+                        "clip": models.VectorParams(size=512, distance=models.Distance.COSINE)
+                    }
+                )
+                print(f"✅ 集合 {name} 创建成功!")
+
+    def _ensure_indices(self):
+        """Ensure necessary payload indices exist."""
+        try:
+            self.client.create_payload_index(
+                collection_name=SPACE_X,
+                field_name="url",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            print(f"✅ Index ensured for {SPACE_X}: url")
+        except Exception as e:
+            # Index might already exist
+            pass
+            
+        try:
+            self.client.create_payload_index(
+                collection_name=SPACE_R,
+                field_name="url",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            print(f"✅ Index ensured for {SPACE_R}: url")
+        except Exception as e:
+            pass
+            
+        try:
+            self.client.create_payload_index(
+                collection_name=SPACE_X,
+                field_name="is_summarized",
+                field_schema=models.PayloadSchemaType.KEYWORD
+            )
+            print("✅ Index ensured for tum_space_x: is_summarized")
+        except Exception:
+            pass
+
+    def get_text_embedding(self, text):
+        """Wrapper for global get_embedding function."""
+        return get_embedding(text=text)
+
+    def trigger_global_recalculation(self):
+        """触发基于 HNSW 结构的立体 PageRank 计算"""
+        print("\n⚡️ 触发立体网络重算 (HNSW-based Recalculation) ⚡️")
+
+        # 1. 拉取 R 空间数据
+        r_points = []
+        offset = None
+        while True:
+            batch, offset = client.scroll(collection_name=SPACE_R, limit=100, with_vectors=True, offset=offset)
+            r_points.extend(batch)
+            if offset is None: break
+
+        if not r_points:
+            print("   ⚠️ Space R 为空，无需计算。")
+            return
+
+        self.r_cache = r_points
+        print(f"   -> Space R 当前节点总数: {len(r_points)}")
+
+        # 2. 构建立体图并计算 PR
+        self._calculate_hnsw_pagerank(r_points)
+
+        # 3. 更新 Space X (投影)
+        self._update_space_x_scores()
+
+    def _calculate_hnsw_pagerank(self, points):
+        """
+        构建 HNSW 立体分层图并计算 PageRank
+        """
+        n = len(points)
+        vectors = np.array([p.vector['clip'] for p in points])
+
+        # --- Step A: 基于交互的权重计算 (Interaction-based Weighting) ---
+        # 不再随机分配层级，而是根据“热度”决定节点引力
+        
+        # 1. 预热冷启动数据 (如果没有任何交互数据)
+        if not self.interaction_mgr.interactions:
+            self.interaction_mgr.simulate_cold_start_data(points)
+
+        # 2. 获取每个节点的交互权重
+        interaction_weights = {}
+        for p in points:
+            # Use URL as key because ID in R differs from ID in X
+            url_key = p.payload.get('url')
+            w = self.interaction_mgr.get_interaction_weight(url_key)
+            interaction_weights[p.id] = w # Store by ID for fast lookup in loop
+            
+        print(f"   -> 📊 交互权重加载完成。Max Weight: {max(interaction_weights.values()):.2f}")
+
+        # --- Step B: 构建邻接矩阵 (Topology Construction) ---
+        adj_matrix = np.zeros((n, n))
+
+        for i in range(n):
+            # 寻找邻居
+            candidates = [j for j in range(n) if i != j]
+            if not candidates: continue
+
+            cand_vectors = vectors[candidates]
+            sims = np.dot(cand_vectors, vectors[i])
+
+            # 选出最近的 M 个邻居 (语义相似)
+            k = min(self.m_neighbors, len(candidates))
+            top_k_indices = np.argsort(sims)[::-1][:k]
+
+            for local_idx in top_k_indices:
+                real_idx = candidates[local_idx]
+                target_id = points[real_idx].id
+                
+                # 语义相似度
+                semantic_sim = sims[local_idx]
+                
+                # 交互加权 (Target 的热度越高，这条边的权重越大)
+                # 逻辑：大家都喜欢引用（连接）热门内容
+                target_weight = interaction_weights.get(target_id, 1.0)
+                
+                # 转移加权 (Transitive Trust)
+                # 如果用户经常从 Source 跳转到 Target，那么这条边应该非常强
+                source_url = points[i].payload.get('url')
+                target_url = points[real_idx].payload.get('url')
+                transition_boost = self.interaction_mgr.get_transition_weight(source_url, target_url)
+                
+                # 最终边权重 = 语义相似度 * 目标热度 * 转移概率
+                final_weight = semantic_sim * target_weight * transition_boost
+                
+                adj_matrix[i][real_idx] = final_weight
+
+        # --- Step C: 运行 Power Iteration (Flow Calculation) ---
+        d = 0.85
+        ranks = np.ones(n) / n
+        for _ in range(30):
+            new_ranks = np.zeros(n)
+            for i in range(n):
+                incoming = np.where(adj_matrix[:, i] > 0)[0]
+                share = 0
+                for j in incoming:
+                    weight = adj_matrix[j][i]
+                    out_weight_sum = np.sum(adj_matrix[j])
+                    if out_weight_sum > 0:
+                        share += (ranks[j] * weight) / out_weight_sum
+                new_ranks[i] = (1 - d) / n + d * share
+            ranks = new_ranks
+
+        # 归一化并缓存
+        if np.sum(ranks) > 0:
+            ranks = ranks / np.sum(ranks)
+        self.r_ranks = {points[i].id: float(ranks[i]) for i in range(n)}
+        print("   -> ✅ HNSW PageRank 迭代计算完成。")
+
+    def _check_novelty(self, vector):
+        """
+        独特性检测：计算向量与 R 空间中最近锚点的距离。
+        返回: (is_novel, min_distance)
+        """
+        if not self.r_cache:
+            # 如果 R 为空，第一个进来的肯定是新的
+            return True, 1.0
+
+        r_vecs = np.array([p.vector['clip'] for p in self.r_cache])
+        # 计算与现有锚点的相似度
+        sims = np.dot(r_vecs, np.array(vector))
+        max_sim = np.max(sims)
+        min_dist = 1.0 - max_sim
+
+        is_novel = min_dist > NOVELTY_THRESHOLD
+        return is_novel, min_dist
+
+    def process_url_and_add(self, url, trigger_recalc=True):
+        """
+        全自动流水线：爬取 -> 清洗(熵) -> 向量化 -> 独特性检测 -> 晋升/入库
+        Args:
+            url: 目标 URL
+            trigger_recalc: 是否立即触发全局重算 (批量导入时建议设为 False)
+        """
+        print(f"\n🤖 开始处理 URL: {url}")
+
+        # 1. 爬取
+        data = crawler.parse(url)
+        if not data:
+            print("   ❌ 爬取失败或内容被过滤")
+            return
+
+        print(f"   -> 爬取成功！获取了 {len(data['texts'])} 个有效文本块 (经过熵值清洗)。")
+
+        promoted_count = 0
+
+        # 2. 处理文本
+        for text in data['texts']:
+            vec = get_embedding(text=text)
+            if not vec: continue
+
+            # --- 独特性检测 ---
+            is_novel, dist = self._check_novelty(vec)
+            promotion_status = False
+
+            if is_novel:
+                # 只有足够独特的知识才会被晋升到 R 空间
+                print(f"   🌟 [NOVELTY DETECTED] 发现新知识 (距离 {dist:.3f} > {NOVELTY_THRESHOLD}) -> 晋升 Space R")
+                print(f"      内容摘要: {text[:40]}...")
+
+                pt_id = str(uuid.uuid4())
+                client.upsert(
+                    collection_name=SPACE_R,
+                    points=[models.PointStruct(id=pt_id, vector={"clip": vec}, payload={"content": text, "url": url})]
+                )
+                promotion_status = True
+                promoted_count += 1
+                
+                # 如果开启了实时重算
+                if trigger_recalc:
+                    self.trigger_global_recalculation()
+
+            # 无论如何，都要添加到 X (搜索池)
+            client.upsert(
+                collection_name=SPACE_X,
+                points=[models.PointStruct(
+                    id=str(uuid.uuid4()),
+                    vector={"clip": vec},
+                    payload={"url": url, "type": "text", "content_preview": text[:100], "pr_score": 0.0}
+                )]
+            )
+
+        print(f"   ✅ URL 处理完成。共有 {promoted_count} 个条目晋升为'元老' (Anchors)。")
+
+    def add_to_space_x(self, text, url=None, promote_to_r=False, is_summarized=False, **kwargs):
+        """
+        添加内容到 Space X (海量信息库)
+        """
+        if not text: return
+        
+        print(f"📥 添加内容到 Space X: {url or 'Text Upload'}")
+
+        # 1. 生成向量 (CLIP Text Encoder)
+        vec = self.get_text_embedding(text)
+        if not vec: return
+
+        # 2. 构造 payload
+        payload = {
+            "url": url,
+            "type": "text",
+            "content": text,
+            "full_text": kwargs.get("full_text", text), # Store original text
+            "content_preview": text[:100],
+            "pr_score": 0.0,
+            "is_summarized": is_summarized
+        }
+
+        # 3. 插入到 X
+        pt_id = str(uuid.uuid4())
+        client.upsert(
+            collection_name=SPACE_X,
+            points=[models.PointStruct(id=pt_id, vector={"clip": vec}, payload=payload)]
+        )
+        print(f"   ✅ 已添加到 Space X (ID: {pt_id})")
+
+        # 4. (可选) 晋升到 R
+        if promote_to_r:
+            print("   -> 🚀 强制晋升到 Space R")
+            client.upsert(
+                collection_name=SPACE_R,
+                points=[models.PointStruct(id=pt_id, vector={"clip": vec}, payload=payload)]
+            )
+            self.trigger_global_recalculation()
+
+    def _update_space_x_scores(self):
+        # 简单的投影更新逻辑
+        if not self.r_cache: return
+
+        # 这里为了演示不打印太多刷屏
+        # print("   -> 更新 Space X 分数 (投影计算)...")
+
+        r_vecs = np.array([p.vector['clip'] for p in self.r_cache])
+        r_scores = np.array([self.r_ranks[p.id] for p in self.r_cache])
+
+        offset = None
+        while True:
+            batch, offset = client.scroll(collection_name=SPACE_X, limit=50, with_vectors=True, offset=offset)
+            if not batch: break
+
+            points_to_update = []
+            for point in batch:
+                x_vec = np.array(point.vector['clip'])
+                sims = np.dot(r_vecs, x_vec)
+                sims[sims < 0] = 0
+                new_score = float(np.sum(sims * r_scores))
+
+                points_to_update.append(models.PointStruct(
+                    id=point.id, vector={"clip": x_vec.tolist()},
+                    payload={**point.payload, "pr_score": new_score}
+                ))
+            client.upsert(collection_name=SPACE_X, points=points_to_update)
+            if offset is None: break
+
+    # ... (保留之前的 __init__, trigger_global_recalculation 等所有代码) ...
+
+    # [新增] 分页浏览接口 (用于 Admin 面板)
+    def browse_collection(self, collection_name, limit=50, offset_id=None):
+        """
+        浏览数据库内容。
+        Qdrant 的 scroll API 使用 offset 指针。
+        """
+        points, next_offset = client.scroll(
+            collection_name=collection_name,
+            limit=limit,
+            with_payload=True,
+            with_vectors=False,  # 浏览时不需要看巨大的向量数据
+            offset=offset_id
+        )
+
+        results = []
+        for p in points:
+            results.append({
+                "id": p.id,
+                "payload": p.payload,
+                "score": p.payload.get("pr_score", 0.0)
+            })
+
+        return {
+            "items": results,
+            "next_offset": next_offset
+        }
+
+    # [新增] 删除接口 (用于 Admin 面板)
+    def delete_item(self, collection_name, point_id):
+        client.delete(
+            collection_name=collection_name,
+            points_selector=models.PointIdsList(points=[point_id])
+        )
+        print(f"🗑️ 已从 {collection_name} 删除 ID: {point_id}")
+        # 如果删的是 R 空间，必须触发重算
+        if collection_name == SPACE_R:
+            self.trigger_global_recalculation()
+
+    # [新增] 从 X 复制到 R (用于 Admin 手动优化)
+    def promote_from_x_to_r(self, point_id):
+        # 1. 先从 X 拿数据
+        points = client.retrieve(
+            collection_name=SPACE_X,
+            ids=[point_id],
+            with_vectors=True,
+            with_payload=True
+        )
+        if not points: return False
+
+        point = points[0]
+
+        # 2. 写入 R
+        client.upsert(
+            collection_name=SPACE_R,
+            points=[models.PointStruct(
+                id=point.id,  # 保持 ID 一致
+                vector=point.vector,
+                payload={**point.payload, "promoted_by_admin": True}
+            )]
+        )
+        print(f"⬆️ 管理员手动晋升 ID: {point_id}")
+
+        # 3. 触发重算
+        self.trigger_global_recalculation()
+        return True
+
+
+    def summarize_text_api(self, text):
+        """Use Gemini API to summarize text."""
+        if not GOOGLE_API_KEY:
+            return text
+            
+        try:
+            # Enforce 200 word limit and ignore child page content
+            prompt = f"Please summarize the following content in strictly under 200 words. Focus ONLY on the main content of the current page. Ignore any lists of sub-pages, navigation menus, or teasers for other articles. Make it concise:\n\n{text[:15000]}"
+            response = self.model.generate_content(prompt)
+            return response.text
+        except Exception as e:
+            print(f"⚠️ API Summarization failed: {e}")
+            return text
+
+    def backfill_summaries(self, force=False):
+        """Iterate through all items in Space X and summarize."""
+        print(f"🔄 Starting backfill of summaries (Force={force})...")
+        offset = None
+        count = 0
+        while True:
+            batch, offset = self.client.scroll(
+                collection_name=SPACE_X, 
+                limit=50, 
+                with_payload=True, 
+                with_vectors=True,
+                offset=offset
+            )
+            if not batch: break
+            
+            points_to_update = []
+            for point in batch:
+                payload = point.payload
+                
+                # If already summarized and not forced, skip
+                if payload.get("is_summarized") and not force:
+                    continue
+                
+                # Use full_text if available, otherwise try to extract from content
+                full_text = payload.get("full_text", "")
+                if not full_text:
+                    if "Original Content:" in content:
+                        parts = content.split("Original Content:\n")
+                        if len(parts) > 1:
+                            full_text = parts[1].strip()
+                    else:
+                        full_text = content
+
+                if not full_text or len(full_text) < 100:
+                    continue
+                    
+                print(f"   📝 Summarizing item: {payload.get('url')}")
+                summary = self.summarize_text_api(full_text)
+                
+                # Update payload
+                new_payload = payload.copy()
+                new_payload["content"] = summary # Store ONLY summary
+                new_payload["full_text"] = full_text # Ensure full_text is preserved
+                new_payload["is_summarized"] = True
+                
+                points_to_update.append(models.PointStruct(
+                    id=point.id,
+                    vector=point.vector,
+                    payload=new_payload
+                ))
+                count += 1
+                
+            if points_to_update:
+                self.client.upsert(collection_name=SPACE_X, points=points_to_update)
+                
+            if offset is None: break
+            
+        print(f"✅ Backfill complete. Updated {count} items.")
+
+    def process_url_recursive(self, start_url, max_depth=1, callback=None):
+        """
+        Recursively crawl and process URLs up to max_depth.
+        callback(count, url): function to call on successful addition.
+        """
+        print(f"🕸️ Starting recursive crawl: {start_url} (Depth: {max_depth})")
+        
+        visited = set()
+        queue = [(start_url, 0)] # (url, depth)
+        count = 0
+        
+        while queue:
+            current_url, depth = queue.pop(0)
+            
+            if current_url in visited:
+                continue
+            visited.add(current_url)
+            
+            # Process current URL
+            try:
+                # 1. Crawl
+                data = self.crawler.parse(current_url)
+                if not data:
+                    continue
+                    
+                # 2. Add to DB (Space X)
+                # Combine texts for content
+                raw_content = "\n\n".join(data['texts'])
+                if not raw_content:
+                    continue
+                
+                # Summarize using API
+                final_content = raw_content
+                is_summarized = False
+                
+                if len(raw_content) > 300:
+                    summary = self.summarize_text_api(raw_content)
+                    if summary != raw_content:
+                        # ONLY store the summary to keep it clean
+                        final_content = summary
+                        is_summarized = True
+                        print(f"   ✨ API Summarized content for {current_url}")
+                    
+                self.add_to_space_x(text=final_content, url=current_url, promote_to_r=False, is_summarized=is_summarized, full_text=raw_content)
+                count += 1
+                
+                # Trigger callback
+                if callback:
+                    callback(count, current_url)
+                
+                # 3. Enqueue children if depth allows
+                if depth < max_depth:
+                    # Filter links to stay on same domain or be relevant?
+                    # For now, let's stick to same domain to avoid exploding
+                    from urllib.parse import urlparse
+                    start_domain = urlparse(start_url).netloc
+                    
+                    for link in data.get('links', []):
+                        if urlparse(link).netloc == start_domain:
+                            if link not in visited:
+                                queue.append((link, depth + 1))
+                                
+            except Exception as e:
+                print(f"⚠️ Error processing {current_url}: {e}")
+                
+        print(f"✅ Recursive crawl finished. Processed {count} pages.")
+        return count
+
+
+# --- 模拟测试 ---
+if __name__ == "__main__":
+    mgr = SystemManager()
+
+    # 我们使用 PageRank 的维基百科页面，这个页面肯定存在
+    # 而且内容硬核，很容易触发独特性检测（如果你之前的锚点都是简单的模拟数据的话）
+    target_url = "https://en.wikipedia.org/wiki/PageRank"
+
+    mgr.process_url_and_add(target_url)

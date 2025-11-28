@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TUM Neural Knowledge Network</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .gradient-text {
+            background: linear-gradient(135deg, #3070b3 0%, #e37222 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 text-slate-800 min-h-screen">
+
+    <!-- Navbar -->
+    <nav class="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-8">
+                    <a href="/" class="flex items-center gap-2 group">
+                        <div
+                            class="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center text-white font-bold shadow-md group-hover:shadow-lg transition-all">
+                            N</div>
+                        <span class="text-xl font-bold tracking-tight gradient-text">TUM Neural Net</span>
+                    </a>
+                    <div class="hidden md:flex items-center space-x-6 text-sm font-medium text-slate-600">
+                        <a href="/" class="hover:text-blue-600 transition-colors">Home</a>
+                        <a href="#" class="hover:text-blue-600 transition-colors">Knowledge Graph</a>
+                        <a href="#" class="hover:text-blue-600 transition-colors">About</a>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <div id="status-indicator"
+                        class="flex items-center text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-full border border-emerald-100">
+                        <span class="w-2 h-2 bg-emerald-500 rounded-full mr-2 animate-pulse"></span>
+                        System Active
+                    </div>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Progress Notification (Hidden by default) -->
+    <div id="progress-toast"
+        class="fixed bottom-6 right-6 z-50 transform transition-all duration-300 translate-y-24 opacity-0">
+        <div class="bg-white rounded-xl shadow-xl border border-slate-100 p-4 w-80">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="text-sm font-bold text-slate-900">Ingesting Knowledge...</h4>
+                <span id="progress-count" class="text-xs font-mono text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">0
+                    items</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-1.5 mb-2 overflow-hidden">
+                <div class="bg-blue-600 h-1.5 rounded-full animate-progress-indeterminate"></div>
+            </div>
+            <p id="progress-detail" class="text-xs text-slate-500 truncate">Initializing crawler...</p>
+        </div>
+    </div>
+
+    <style>
+        @keyframes progress-indeterminate {
+            0% {
+                width: 0%;
+                margin-left: 0%;
+            }
+
+            50% {
+                width: 70%;
+                margin-left: 30%;
+            }
+
+            100% {
+                width: 0%;
+                margin-left: 100%;
+            }
+        }
+
+        .animate-progress-indeterminate {
+            animation: progress-indeterminate 1.5s infinite ease-in-out;
+        }
+    </style>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+        <!-- Hero Section -->
+        <div class="text-center mb-16">
+            <h1 class="text-4xl sm:text-5xl font-extrabold text-slate-900 mb-4">
+                Query the <span class="gradient-text">Collective Intelligence</span>
+            </h1>
+            <p class="text-lg text-slate-600 max-w-2xl mx-auto">
+                Access the distributed knowledge of the Technical University of Munich.
+                Powered by semantic understanding and transitive trust algorithms.
+            </p>
+        </div>
+
+        <!-- Search Interface -->
+        <div class="max-w-3xl mx-auto mb-16">
+            <div class="relative group">
+                <div
+                    class="absolute -inset-1 bg-gradient-to-r from-blue-600 to-orange-600 rounded-lg blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200">
+                </div>
+                <div class="relative">
+                    <input type="text" id="search-input"
+                        class="block w-full p-5 pl-6 text-lg text-slate-900 border border-slate-200 rounded-lg bg-white shadow-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                        placeholder="Ask the network (e.g., 'Engineering Degrees')..." required>
+                    <button onclick="performSearch()"
+                        class="absolute right-2.5 bottom-2.5 bg-slate-900 text-white hover:bg-slate-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-6 py-3 transition-colors">
+                        Ignite
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Educational Cards (How it Works) -->
+        <div id="intro-cards" class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
+            <!-- Card 1 -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div class="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center mb-4 text-blue-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+                        </path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 mb-2">Knowledge Commons</h3>
+                <p class="text-sm text-slate-600">
+                    The raw data layer where all crawled information resides. It serves as the foundation for semantic
+                    retrieval.
+                </p>
+            </div>
+            <!-- Card 2 -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div class="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center mb-4 text-orange-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 mb-2">Curated Core</h3>
+                <p class="text-sm text-slate-600">
+                    A curated layer of "Novelty Anchors". Only unique, high-entropy knowledge is promoted here to form
+                    the network's backbone.
+                </p>
+            </div>
+            <!-- Card 3 -->
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
+                <div class="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center mb-4 text-purple-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-bold text-slate-900 mb-2">Transitive Trust</h3>
+                <p class="text-sm text-slate-600">
+                    Authority flows through user navigation. If you trust A, and A links to B, then B gains trust.
+                </p>
+            </div>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results-area" class="max-w-4xl mx-auto space-y-6">
+            <!-- Results will be injected here -->
+        </div>
+
+        <!-- Injection Panel (Upload) -->
+        <div class="mt-24 border-t border-slate-200 pt-12">
+            <h2 class="text-2xl font-bold text-slate-900 mb-6 text-center">Inject Knowledge</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <!-- URL Injection -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200">
+                    <h3 class="font-semibold mb-4 flex items-center">
+                        <span
+                            class="bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded">URL</span>
+                        Crawl & Absorb
+                    </h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="url-input"
+                            class="flex-1 bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block p-2.5"
+                            placeholder="https://tum.de/...">
+                        <button onclick="uploadUrl()"
+                            class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5">Inject</button>
+                    </div>
+                </div>
+                <!-- Text Injection -->
+                <div class="bg-white p-6 rounded-xl border border-slate-200">
+                    <h3 class="font-semibold mb-4 flex items-center">
+                        <span
+                            class="bg-gray-100 text-gray-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded">TEXT</span>
+                        Direct Input
+                    </h3>
+                    <div class="flex gap-2">
+                        <input type="text" id="text-input"
+                            class="flex-1 bg-slate-50 border border-slate-300 text-slate-900 text-sm rounded-lg focus:ring-gray-500 focus:border-gray-500 block p-2.5"
+                            placeholder="Paste knowledge snippet...">
+                        <button onclick="uploadText()"
+                            class="text-white bg-gray-700 hover:bg-gray-800 focus:ring-4 focus:ring-gray-300 font-medium rounded-lg text-sm px-5 py-2.5">Inject</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trending Section -->
+        <div class="max-w-7xl mx-auto mb-16 px-4">
+            <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <span class="w-2 h-8 bg-orange-500 rounded-full"></span>
+                🔥 Trending Now
+            </h2>
+            <div id="trending-area" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Trending items will be injected here -->
+                <div class="col-span-full text-center py-8 text-slate-400">Loading hot topics...</div>
+            </div>
+        </div>
+
+        <!-- Knowledge Feed Section -->
+        <div class="max-w-7xl mx-auto mb-16 px-4">
+            <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <span class="w-2 h-8 bg-blue-600 rounded-full"></span>
+                Recent Knowledge Ingestions
+            </h2>
+            <div id="feed-area" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Feed items will be injected here -->
+                <div class="col-span-full text-center py-8 text-slate-400">Loading feed...</div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Notification Toast -->
+    <div id="notification-toast"
+        class="fixed bottom-5 right-5 bg-slate-900 text-white px-6 py-4 rounded-lg shadow-2xl transform translate-y-24 transition-transform duration-300 flex items-center gap-4 z-50 max-w-md">
+        <div class="flex-1">
+            <h4 class="font-bold text-sm text-blue-400 mb-1">System Update</h4>
+            <p class="text-xs text-slate-300" id="notification-msg">Network synchronized.</p>
+        </div>
+        <button onclick="hideNotification()" class="text-slate-500 hover:text-white">✕</button>
+    </div>
+
+    <script>
+        // WebSocket for Real-time Updates
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+        const progressToast = document.getElementById('progress-toast');
+        const progressCount = document.getElementById('progress-count');
+        const progressDetail = document.getElementById('progress-detail');
+        let progressTimer;
+
+        ws.onmessage = function (event) {
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'progress') {
+                // Show toast
+                progressToast.classList.remove('translate-y-24', 'opacity-0');
+
+                // Update content
+                progressCount.textContent = `${data.count} items`;
+                progressDetail.textContent = data.details;
+
+                // Auto hide after inactivity
+                clearTimeout(progressTimer);
+                progressTimer = setTimeout(() => {
+                    progressToast.classList.add('translate-y-24', 'opacity-0');
+                }, 5000); // Keep visible for 5s after last update
+            }
+            else if (data.type === 'system_update') {
+                // Show completion message
+                progressToast.classList.remove('translate-y-24', 'opacity-0');
+                progressCount.textContent = "Done";
+                progressCount.className = "text-xs font-mono text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full";
+                progressDetail.textContent = "Synchronization Complete.";
+
+                // Refresh feeds
+                loadFeed();
+                loadTrending();
+
+                // Hide after 5s
+                setTimeout(() => {
+                    progressToast.classList.add('translate-y-24', 'opacity-0');
+                }, 5000);
+            }
+            else if (data.type === 'error') {
+                alert("System Error: " + data.message);
+            }
+        };
+
+        function showNotification(msg) {
+            const toast = document.getElementById('notification-toast');
+            document.getElementById('notification-msg').textContent = msg;
+            toast.classList.remove('translate-y-24');
+            setTimeout(hideNotification, 5000);
+        }
+
+        function hideNotification() {
+            document.getElementById('notification-toast').classList.add('translate-y-24');
+        }
+
+        async function recordInteraction(itemId, url) {
+            const formData = new FormData();
+            formData.append('item_id', itemId); // Use UUID for tracking
+            formData.append('action', 'click');
+
+            try {
+                await fetch('/api/feedback', {
+                    method: 'POST',
+                    body: formData,
+                    keepalive: true
+                });
+                console.log("Interaction recorded for", itemId);
+            } catch (e) {
+                console.error("Failed to record interaction", e);
+            }
+        }
+
+        async function loadFeed() {
+            const feedDiv = document.getElementById('feed-area');
+            try {
+                const response = await fetch('/api/feed?limit=6');
+                const data = await response.json();
+
+                if (!data.points || data.points.length === 0) {
+                    feedDiv.innerHTML = '<div class="col-span-full text-center py-8 text-slate-400">No knowledge found in the Commons.</div>';
+                    return;
+                }
+
+                feedDiv.innerHTML = '';
+                data.points.forEach(pt => {
+                    const p = pt.payload;
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-5 rounded-lg border border-slate-100 shadow-sm hover:shadow-md transition-all';
+                    card.innerHTML = `
+                        <div class="text-xs font-bold text-slate-400 mb-2 uppercase tracking-wider">${p.type || 'Unknown'}</div>
+                        <a href="/view/${pt.id}" class="block text-base font-bold text-slate-800 hover:text-blue-600 mb-2 line-clamp-1">${p.url || 'Untitled'}</a>
+                        <div class="text-sm text-slate-500 line-clamp-3 mb-3">${p.content_preview || ''}</div>
+                        <div class="text-xs text-slate-400 font-mono">ID: ${pt.id.substring(0, 6)}...</div>
+                    `;
+                    feedDiv.appendChild(card);
+                });
+            } catch (e) {
+                feedDiv.innerHTML = `<div class="col-span-full text-center text-red-400">Failed to load feed: ${e.message}</div>`;
+            }
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('search-input').value;
+            if (!query) return;
+
+            const resultsDiv = document.getElementById('results-area');
+            const introCards = document.getElementById('intro-cards');
+
+            // Hide intro cards
+            if (introCards) introCards.style.display = 'none';
+
+            resultsDiv.innerHTML = '<div class="text-center py-12"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div><p class="mt-4 text-slate-500">Traversing the neural pathways...</p></div>';
+
+            try {
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+                const data = await response.json();
+
+                resultsDiv.innerHTML = '';
+
+                if (data.results.length === 0) {
+                    resultsDiv.innerHTML = '<div class="text-center py-12 text-slate-500">No neural connections found. Try injecting more knowledge.</div>';
+                    return;
+                }
+
+                data.results.forEach(item => {
+                    const title = item.url || "Untitled Node";
+                    const snippet = item.content || "No preview available.";
+                    const score = (item.score * 100).toFixed(1);
+
+                    const card = document.createElement('div');
+                    card.className = 'bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-all hover:-translate-y-1 duration-200 cursor-pointer';
+                    // Add click tracking
+                    card.onclick = (e) => {
+                        // Prevent default if it was a link click, we handle navigation
+                        if (!e.target.closest('a')) {
+                            recordInteraction(item.id, item.url);
+                            window.location.href = `/view/${item.id}`;
+                        }
+                    };
+
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start mb-2">
+                            <a href="/view/${item.id}" onclick="event.stopPropagation(); recordInteraction('${item.id}', '${item.url}')" class="text-lg font-bold text-blue-600 hover:text-blue-800 transition-colors line-clamp-1">${title}</a>
+                            <span class="bg-blue-50 text-blue-700 text-xs font-bold px-2 py-1 rounded-full border border-blue-100">${score}% Match</span>
+                        </div>
+                        <div class="text-xs text-slate-400 mb-3 font-mono truncate">${item.url}</div>
+                        <p class="text-slate-600 text-sm leading-relaxed line-clamp-3">${snippet}</p>
+                        <div class="mt-4 pt-4 border-t border-slate-50 flex justify-between items-center">
+                            <span class="text-xs text-slate-400">ID: ${item.id.substring(0, 8)}...</span>
+                            <span class="text-sm font-medium text-slate-900 flex items-center gap-1">
+                                Explore Node 
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+                            </span>
+                        </div>
+                    `;
+                    resultsDiv.appendChild(card);
+                });
+
+            } catch (e) {
+                resultsDiv.innerHTML = `<div class="text-center text-red-500 py-8">Neural Link Error: ${e.message}</div>`;
+            }
+        }
+
+        async function uploadUrl() {
+            const url = document.getElementById('url-input').value;
+            if (!url) return;
+            const formData = new FormData();
+            formData.append('url', url);
+            await fetch('/api/upload/url', { method: 'POST', body: formData });
+            document.getElementById('url-input').value = '';
+            showNotification("URL injected into the cortex. Processing...");
+        }
+
+        async function uploadText() {
+            const text = document.getElementById('text-input').value;
+            if (!text) return;
+            const formData = new FormData();
+            formData.append('text', text);
+            await fetch('/api/upload/text', { method: 'POST', body: formData });
+            document.getElementById('text-input').value = '';
+            showNotification("Text fragment absorbed. Processing...");
+        }
+
+        // Enter key to search
+        document.getElementById('search-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') performSearch();
+        });
+
+        // Load feed on start
+        loadFeed();
+        loadTrending();
+
+        async function loadTrending() {
+            const trendingDiv = document.getElementById('trending-area');
+            try {
+                const response = await fetch('/api/trending?limit=3');
+                const data = await response.json();
+
+                if (!data.results || data.results.length === 0) {
+                    trendingDiv.innerHTML = '<div class="col-span-full text-center py-8 text-slate-400">No trending topics yet. Start exploring!</div>';
+                    return;
+                }
+
+                trendingDiv.innerHTML = '';
+                data.results.forEach((item, index) => {
+                    const p = item.payload;
+                    const card = document.createElement('div');
+                    card.className = 'bg-gradient-to-br from-orange-50 to-white p-5 rounded-xl border border-orange-100 shadow-sm hover:shadow-md transition-all relative overflow-hidden cursor-pointer';
+                    card.onclick = () => window.location.href = `/view/${item.id}`;
+
+                    card.innerHTML = `
+                        <div class="absolute top-0 right-0 bg-orange-100 text-orange-600 text-xs font-bold px-3 py-1 rounded-bl-xl">#${index + 1}</div>
+                        <div class="text-xs font-bold text-orange-400 mb-2 uppercase tracking-wider">Hot Topic</div>
+                        <div class="text-lg font-bold text-slate-900 mb-2 line-clamp-1">${p.url || 'Untitled'}</div>
+                        <div class="text-sm text-slate-500 line-clamp-2 mb-3">${p.content_preview || ''}</div>
+                        <div class="flex items-center gap-2 text-xs text-slate-400 font-mono">
+                            <span class="flex items-center gap-1 text-orange-500 font-bold">
+                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M12.316 3.051a1 1 0 01.633 1.265l-4 12a1 1 0 11-1.898-.632l4-12a1 1 0 011.265-.633zM5.707 6.293a1 1 0 010 1.414L3.414 10l2.293 2.293a1 1 0 11-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0zm8.586 0a1 1 0 011.414 0l3 3a1 1 0 010 1.414l-3 3a1 1 0 11-1.414-1.414L16.586 10l-2.293-2.293a1 1 0 010-1.414z"/></svg>
+                                ${item.clicks} Clicks
+                            </span>
+                        </div>
+                    `;
+                    trendingDiv.appendChild(card);
+                });
+            } catch (e) {
+                trendingDiv.innerHTML = `<div class="col-span-full text-center text-red-400">Failed to load trending: ${e.message}</div>`;
+            }
+        }
+    </script>
+</body>
+
+</html>

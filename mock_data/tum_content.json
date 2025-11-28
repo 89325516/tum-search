@@ -1,0 +1,367 @@
+[
+  {
+    "id": 1,
+    "url": "https://tum.de/course/cs/python_basics/list_comprehension",
+    "type": "text",
+    "content": "List comprehension in Python offers a shorter syntax when you want to create a new list based on the values of an existing list. It is generally more compact and faster than normal functions and loops for creating list. Syntax: [expression for item in iterable if condition == True].",
+    "timestamp_hours_ago": 12.5
+  },
+  {
+    "id": 2,
+    "url": "https://tum.de/course/math/linear_algebra/eigenvalues",
+    "type": "text",
+    "content": "An eigenvector of a linear transformation is a non-zero vector that changes at most by a scalar factor when that linear transformation is applied to it. The corresponding scalar is the eigenvalue. If T is a linear transformation, v is a vector, and λ is a scalar such that T(v) = λv, then v is the eigenvector and λ is the eigenvalue.",
+    "timestamp_hours_ago": 48.2
+  },
+  {
+    "id": 3,
+    "url": "https://tum.de/course/math/linear_algebra/eigenvalues",
+    "type": "image",
+    "content_desc": "A geometric visualization of an eigenvector transformation. The diagram shows a vector v in a 2D plane being stretched by a factor of lambda without changing its direction, illustrating the concept of T(v) = lambda * v.",
+    "image_path": "linalg_eigen_viz.png",
+    "timestamp_hours_ago": 48.2
+  },
+  {
+    "id": 4,
+    "url": "https://tum.de/course/mgmt/strategic_mgmt/porters_five_forces",
+    "type": "text",
+    "content": "Porter's Five Forces is a framework for analyzing a company's competitive environment. The number and power of a company's competitive rivals, potential new market entrants, suppliers, customers, and substitute products influence a company's profitability.",
+    "timestamp_hours_ago": 120.5
+  },
+  {
+    "id": 5,
+    "url": "https://tum.de/course/mgmt/strategic_mgmt/porters_five_forces",
+    "type": "image",
+    "content_desc": "A block diagram illustrating Porter's Five Forces. The center block represents 'Competitive Rivalry'. Four arrows point inward from surrounding blocks labeled: 'Threat of New Entrants', 'Bargaining Power of Suppliers', 'Bargaining Power of Buyers', and 'Threat of Substitutes'.",
+    "image_path": "porters_diagram_v2.jpg",
+    "timestamp_hours_ago": 120.5
+  },
+  {
+    "id": 6,
+    "url": "https://tum.de/course/cs/python_advanced/global_interpreter_lock",
+    "type": "text",
+    "content": "The Python Global Interpreter Lock (GIL) is a mutex that allows only one thread to hold the control of the Python interpreter. This means that only one thread can be in a state of execution at any point in time. The impact of the GIL is visible to developers who execute single-threaded scripts and helps prevent race conditions.",
+    "timestamp_hours_ago": 5.1
+  },
+  {
+    "id": 7,
+    "url": "https://tum.de/course/math/linear_algebra/matrix_multiplication",
+    "type": "text",
+    "content": "Matrix multiplication is a binary operation that produces a matrix from two matrices. For matrix multiplication to be defined, the number of columns in the first matrix must be equal to the number of rows in the second matrix. The resulting matrix, known as the matrix product, has the number of rows of the first and the number of columns of the second matrix.",
+    "timestamp_hours_ago": 330.0
+  },
+  {
+    "id": 8,
+    "url": "https://tum.de/course/mgmt/strategic_mgmt/blue_ocean_strategy",
+    "type": "text",
+    "content": "Blue Ocean Strategy generally refers to the creation by a company of a new, uncontested market space that makes competitors irrelevant and creates new consumer value often while decreasing costs. It contrasts with 'Red Ocean' strategy where companies fight for a share of an existing market.",
+    "timestamp_hours_ago": 600.8
+  },
+  {
+    "id": 9,
+    "url": "https://tum.de/course/cs/algorithms/binary_search_tree",
+    "type": "text",
+    "content": "A Binary Search Tree (BST) is a node-based binary tree data structure which has the following properties: The left subtree of a node contains only nodes with keys lesser than the node's key. The right subtree of a node contains only nodes with keys greater than the node's key. The left and right subtree each must also be a binary search tree.",
+    "timestamp_hours_ago": 715.4
+  },
+  {
+    "id": 10,
+    "url": "https://tum.de/course/cs/algorithms/binary_search_tree",
+    "type": "image",
+    "content_desc": "A hierarchical tree diagram representing a Binary Search Tree. The root node has the value 8. The left child is 3 and the right child is 10. The node 3 has children 1 and 6, illustrating the property that left children are smaller and right children are larger than the parent.",
+    "image_path": "bst_structure.png",
+    "timestamp_hours_ago": 715.4
+  },
+  {
+    "id": 11,
+    "url": "https://tum.de/course/math/linear_algebra/dot_product",
+    "type": "text",
+    "content": "The dot product (scalar product) of two vectors is an algebraic operation that takes two equal-length sequences of numbers and returns a single number. Geometrically, it is the product of the Euclidean magnitudes of the two vectors and the cosine of the angle between them.",
+    "timestamp_hours_ago": 45.3
+  },
+  {
+    "id": 12,
+    "url": "https://tum.de/course/mgmt/strategic_mgmt/swot_analysis",
+    "type": "image",
+    "content_desc": "A 2x2 matrix chart for SWOT Analysis. The top row contains 'Strengths' (Internal/Positive) and 'Weaknesses' (Internal/Negative). The bottom row contains 'Opportunities' (External/Positive) and 'Threats' (External/Negative).",
+    "image_path": "swot_matrix_final.jpg",
+    "timestamp_hours_ago": 88.9
+  },
+  {
+    "id": 13,
+    "url": "https://tum.de/course/mgmt/strategic_mgmt/swot_analysis",
+    "type": "text",
+    "content": "SWOT analysis is a strategic planning technique used to help a person or organization identify strengths, weaknesses, opportunities, and threats related to business competition or project planning. It involves specifying the objective of the business venture or project and identifying the internal and external factors that are favorable and unfavorable to achieving those objectives.",
+    "timestamp_hours_ago": 88.9
+  },
+  {
+    "id": 14,
+    "url": "https://tum.de/course/cs/python_basics/dictionaries",
+    "type": "text",
+    "content": "Python dictionaries are unordered collections of data values, used to store data values like a map. Unlike other Data Types that hold only a single value as an element, Dictionary holds key:value pair. Key-value is provided in the dictionary to make it more optimized. Keys must be immutable.",
+    "timestamp_hours_ago": 2.1
+  },
+  {
+    "id": 15,
+    "url": "https://tum.de/course/math/linear_algebra/gaussian_elimination",
+    "type": "text",
+    "content": "Gaussian elimination, also known as row reduction, is an algorithm for solving systems of linear equations. It consists of a sequence of operations performed on the corresponding matrix of coefficients. This method can also be used to find the rank of a matrix, to calculate the determinant of a matrix, and to calculate the inverse of an invertible square matrix.",
+    "timestamp_hours_ago": 150.7
+  },
+  {
+    "id": 16,
+    "url": "https://tum.de/course/math/linear_algebra/basis_vectors",
+    "type": "image",
+    "content_desc": "A 3D coordinate system graph showing standard basis vectors. An x-axis with vector i (1,0,0) in red, a y-axis with vector j (0,1,0) in green, and a z-axis with vector k (0,0,1) in blue, originating from the center (0,0,0).",
+    "image_path": "basis_vectors_3d.png",
+    "timestamp_hours_ago": 210.0
+  },
+  {
+    "id": 17,
+    "url": "https://tum.de/course/mgmt/strategic_mgmt/pestel_analysis",
+    "type": "text",
+    "content": "PESTEL analysis describes a framework of macro-environmental factors used in the environmental scanning component of strategic management. It is part of an external analysis when conducting a strategic audit or doing market research, and gives an overview of the different macro-environmental factors to be taken into consideration. PESTEL stands for Political, Economic, Social, Technological, Environmental, and Legal.",
+    "timestamp_hours_ago": 400.2
+  },
+  {
+    "id": 18,
+    "url": "https://tum.de/course/cs/python_advanced/decorators",
+    "type": "text",
+    "content": "A decorator in Python is a design pattern that allows a user to add new functionality to an existing object without modifying its structure. Decorators are usually called before the definition of a function you want to decorate. In Python, functions are first-class citizens, meaning they can be passed as arguments.",
+    "timestamp_hours_ago": 65.5
+  },
+  {
+    "id": 19,
+    "url": "https://tum.de/course/math/linear_algebra/determinants",
+    "type": "text",
+    "content": "The determinant is a scalar value that is a function of the entries of a square matrix. It allows characterizing some properties of the matrix and the linear map represented by the matrix. In particular, the determinant is nonzero if and only if the matrix is invertible.",
+    "timestamp_hours_ago": 19.8
+  },
+  {
+    "id": 20,
+    "url": "https://tum.de/course/mgmt/digital_transformation/platform_business_models",
+    "type": "image",
+    "content_desc": "A flowchart diagram depicting a Platform Business Model ecosystem. It connects 'Producers' on the left and 'Consumers' on the right via a central 'Platform' circle. Arrows indicate the exchange of value and data, with the platform facilitating the transaction.",
+    "image_path": "platform_ecosystem.jpg",
+    "timestamp_hours_ago": 10.5
+  },
+  {
+    "id": 21,
+    "url": "https://tum.de/course/cs/data_structures/stack_vs_heap",
+    "type": "image",
+    "content_desc": "A schematic diagram comparing Stack vs Heap memory. The Stack side shows ordered blocks representing function calls and local variables (LIFO). The Heap side shows scattered, dynamically allocated objects linked by pointers, illustrating the chaotic nature of dynamic memory.",
+    "image_path": "memory_stack_heap.png",
+    "timestamp_hours_ago": 55.4
+  },
+  {
+    "id": 22,
+    "url": "https://tum.de/course/cs/data_structures/stack_vs_heap",
+    "type": "text",
+    "content": "In programming, the Stack is a region of memory that stores temporary variables created by each function (including the main function). The Heap is a region of memory used for dynamic memory allocation. Variables allocated on the heap have their memory allocated at run time and accessing this memory is somewhat slower, but the heap size is limited only by the size of virtual memory.",
+    "timestamp_hours_ago": 55.4
+  },
+  {
+    "id": 23,
+    "url": "https://tum.de/course/cs/python_basics/tuples_vs_lists",
+    "type": "text",
+    "content": "In Python, a Tuple is very similar to a List, but the main difference is immutability. Once a tuple is created, you cannot change its values. Tuples are defined using parentheses (), whereas lists use square brackets []. Tuples are faster than lists and are used to write-protect data.",
+    "timestamp_hours_ago": 18.2
+  },
+  {
+    "id": 24,
+    "url": "https://tum.de/course/mgmt/strategic_mgmt/value_chain",
+    "type": "text",
+    "content": "Porter's Value Chain is a business management concept that identifies the primary and support activities that add value to a final product and then analyzes these activities to reduce costs or increase differentiation. Primary activities include inbound logistics, operations, outbound logistics, marketing, and service.",
+    "timestamp_hours_ago": 145.0
+  },
+  {
+    "id": 25,
+    "url": "https://tum.de/course/mgmt/strategic_mgmt/value_chain",
+    "type": "image",
+    "content_desc": "A chevron-shaped diagram of Porter's Value Chain. The bottom half shows 'Primary Activities' flowing from left to right. The top half shows 'Support Activities' like HR and Technology. The arrow tip on the right represents 'Margin' or 'Profit'.",
+    "image_path": "value_chain_diagram.png",
+    "timestamp_hours_ago": 145.0
+  },
+  {
+    "id": 26,
+    "url": "https://tum.de/course/math/linear_algebra/identity_matrix",
+    "type": "text",
+    "content": "The Identity Matrix, denoted as I, is a square matrix in which all the elements of the principal diagonal are ones and all other elements are zeros. The effect of multiplying a matrix A by the Identity Matrix is that the matrix A remains unchanged: A * I = A.",
+    "timestamp_hours_ago": 305.5
+  },
+  {
+    "id": 27,
+    "url": "https://tum.de/course/math/linear_algebra/identity_matrix",
+    "type": "image",
+    "content_desc": "A visual representation of a 3x3 Identity Matrix. The numbers 1, 1, 1 form a diagonal line from the top-left to the bottom-right corner. All other cells contain the number 0.",
+    "image_path": "identity_matrix_3x3.jpg",
+    "timestamp_hours_ago": 305.5
+  },
+  {
+    "id": 28,
+    "url": "https://tum.de/course/cs/data_science/pandas_dataframe",
+    "type": "text",
+    "content": "A Pandas DataFrame is a 2-dimensional labeled data structure with columns of potentially different types. It is similar to a spreadsheet or SQL table, or a dict of Series objects. It is the most commonly used pandas object for data analysis and manipulation in Python.",
+    "timestamp_hours_ago": 3.4
+  },
+  {
+    "id": 29,
+    "url": "https://tum.de/course/cs/data_science/pandas_dataframe",
+    "type": "image",
+    "content_desc": "A screenshot showing the structure of a Pandas DataFrame. It highlights the 'Index' on the left, 'Column Names' at the top, and the grid of data values in the center. Rows and columns are clearly labeled.",
+    "image_path": "pandas_df_structure.png",
+    "timestamp_hours_ago": 3.4
+  },
+  {
+    "id": 30,
+    "url": "https://tum.de/course/mgmt/strategic_mgmt/vrio_framework",
+    "type": "text",
+    "content": "The VRIO framework is a strategic analysis tool used to uncover and protect the resources and capabilities that give a firm a long-term competitive advantage. VRIO stands for Value, Rarity, Imitability, and Organization. If a resource meets all four criteria, it provides a sustained competitive advantage.",
+    "timestamp_hours_ago": 510.8
+  },
+  {
+    "id": 31,
+    "url": "https://tum.de/course/math/linear_algebra/transpose",
+    "type": "text",
+    "content": "The transpose of a matrix is an operator which flips a matrix over its diagonal; that is, it switches the row and column indices of the matrix A by producing another matrix, often denoted by A^T. If A is an m x n matrix, A^T is an n x m matrix.",
+    "timestamp_hours_ago": 22.1
+  },
+  {
+    "id": 32,
+    "url": "https://tum.de/course/cs/python_basics/lambda_functions",
+    "type": "text",
+    "content": "A lambda function in Python is a small anonymous function. It can take any number of arguments, but can only have one expression. The syntax is: lambda arguments : expression. They are often used inside functions like filter(), map(), and reduce().",
+    "timestamp_hours_ago": 8.9
+  },
+  {
+    "id": 33,
+    "url": "https://tum.de/course/mgmt/digital_business/network_effects",
+    "type": "text",
+    "content": "Network Effects occur when a product or service becomes more valuable to its users as more people use it. This is a key concept in digital platform businesses (like social media or Uber). Direct network effects happen when usage increases value for other users; indirect effects happen when usage increases value for complementary products.",
+    "timestamp_hours_ago": 60.2
+  },
+  {
+    "id": 34,
+    "url": "https://tum.de/course/mgmt/digital_business/network_effects",
+    "type": "image",
+    "content_desc": "A graph illustrating Metcalf's Law and Network Effects. The x-axis represents the number of users, and the y-axis represents the value of the network. The curve grows exponentially, showing that value increases non-linearly with user growth.",
+    "image_path": "network_effects_graph.jpg",
+    "timestamp_hours_ago": 60.2
+  },
+  {
+    "id": 35,
+    "url": "https://tum.de/course/math/linear_algebra/linear_independence",
+    "type": "text",
+    "content": "In linear algebra, a set of vectors is said to be linearly independent if no vector in the set can be defined as a linear combination of the others. If one vector depends on the others, the set is linearly dependent. This concept is crucial for defining a basis for a vector space.",
+    "timestamp_hours_ago": 99.5
+  },
+  {
+    "id": 36,
+    "url": "https://tum.de/course/cs/algorithms/big_o_notation",
+    "type": "text",
+    "content": "Big O notation is a mathematical notation that describes the limiting behavior of a function when the argument tends towards a particular value or infinity. In computer science, it is used to classify algorithms according to how their run time or space requirements grow as the input size grows (e.g., O(n), O(log n), O(n^2)).",
+    "timestamp_hours_ago": 412.0
+  },
+  {
+    "id": 37,
+    "url": "https://tum.de/course/cs/algorithms/big_o_notation",
+    "type": "image",
+    "content_desc": "A comparison line chart of Time Complexity. Lines represent different complexities: O(1) is flat, O(log n) rises slowly, O(n) is linear, and O(n^2) and O(2^n) curve sharply upwards, indicating inefficiency for large inputs.",
+    "image_path": "big_o_complexity_chart.png",
+    "timestamp_hours_ago": 412.0
+  },
+  {
+    "id": 38,
+    "url": "https://tum.de/course/mgmt/strategic_mgmt/disruptive_innovation",
+    "type": "text",
+    "content": "Disruptive Innovation describes a process by which a product or service takes root initially in simple applications at the bottom of a market and then relentlessly moves up market, eventually displacing established competitors. It was coined by Clayton Christensen.",
+    "timestamp_hours_ago": 670.3
+  },
+  {
+    "id": 39,
+    "url": "https://tum.de/course/math/linear_algebra/orthogonal_vectors",
+    "type": "text",
+    "content": "Two vectors are orthogonal if their dot product is zero. Geometrically, in Euclidean space, this means they are perpendicular to each other (meet at a 90-degree angle). Orthogonality is a generalization of the concept of perpendicularity to higher dimensions.",
+    "timestamp_hours_ago": 110.4
+  },
+  {
+    "id": 40,
+    "url": "https://tum.de/course/cs/oop/inheritance",
+    "type": "text",
+    "content": "Inheritance is a fundamental concept in Object-Oriented Programming (OOP) where a new class (child or subclass) derives attributes and methods from an existing class (parent or superclass). This promotes code reusability and establishes a hierarchy between classes.",
+    "timestamp_hours_ago": 28.6
+  },
+  {
+    "id": 41,
+    "url": "https://tum.de/course/cs/oop/inheritance",
+    "type": "image",
+    "content_desc": "A UML Class Diagram illustrating Inheritance. A top box labeled 'Vehicle' connects to two bottom boxes labeled 'Car' and 'Truck' via arrows with hollow triangles pointing upwards, indicating 'Car is a Vehicle'.",
+    "image_path": "uml_inheritance.jpg",
+    "timestamp_hours_ago": 28.6
+  },
+  {
+    "id": 42,
+    "url": "https://tum.de/course/math/linear_algebra/rank",
+    "type": "text",
+    "content": "The rank of a matrix is the maximum number of linearly independent column vectors in the matrix, which is the same as the maximum number of linearly independent row vectors. It is a measure of the 'non-degenerateness' of the system of linear equations represented by the matrix.",
+    "timestamp_hours_ago": 340.1
+  },
+  {
+    "id": 43,
+    "url": "https://tum.de/course/mgmt/project_mgmt/agile_scrum",
+    "type": "text",
+    "content": "Agile is an iterative approach to project management and software development that helps teams deliver value to their customers faster and with fewer headaches. Scrum is a specific Agile framework that utilizes fixed-length iterations called Sprints, daily stand-up meetings, and roles like Scrum Master and Product Owner.",
+    "timestamp_hours_ago": 15.7
+  },
+  {
+    "id": 44,
+    "url": "https://tum.de/course/cs/web/rest_api",
+    "type": "text",
+    "content": "REST (Representational State Transfer) is an architectural style for providing standards between computer systems on the web, making it easier for systems to communicate with each other. REST APIs use standard HTTP methods like GET, POST, PUT, and DELETE to perform operations on resources.",
+    "timestamp_hours_ago": 5.2
+  },
+  {
+    "id": 45,
+    "url": "https://tum.de/course/mgmt/strategic_mgmt/okr_framework",
+    "type": "text",
+    "content": "OKRs (Objectives and Key Results) is a goal-setting framework used by individuals, teams, and organizations to define measurable goals and track their outcomes. The 'Objective' is clearly defined and significant, while 'Key Results' are the specific benchmarks used to track the achievement of that objective.",
+    "timestamp_hours_ago": 24.5
+  },
+  {
+    "id": 46,
+    "url": "https://tum.de/course/cs/software_arch/microservices",
+    "type": "text",
+    "content": "Microservices architecture is an approach in which a single application is composed of many loosely coupled and independently deployable smaller services. Each service usually implements a specific business capability and communicates with others via HTTP API or message queues. It contrasts with Monolithic architecture.",
+    "timestamp_hours_ago": 7.8
+  },
+  {
+    "id": 47,
+    "url": "https://tum.de/course/cs/software_arch/microservices",
+    "type": "image",
+    "content_desc": "A comparison diagram between Monolithic and Microservices architecture. The left side shows a single large block containing UI, Business Logic, and Data Access. The right side shows multiple small, distinct blocks (Service A, Service B, Service C) each with their own database, connected by a network.",
+    "image_path": "microservices_vs_monolith.png",
+    "timestamp_hours_ago": 7.8
+  },
+  {
+    "id": 48,
+    "url": "https://tum.de/course/math/linear_algebra/cross_product",
+    "type": "text",
+    "content": "The cross product is a binary operation on two vectors in a three-dimensional oriented Euclidean vector space. Unlike the dot product, the result of a cross product is a vector, not a scalar. The resulting vector is perpendicular (orthogonal) to both of the vectors being multiplied.",
+    "timestamp_hours_ago": 190.2
+  },
+  {
+    "id": 49,
+    "url": "https://tum.de/course/math/linear_algebra/cross_product",
+    "type": "image",
+    "content_desc": "A visual illustration of the Right-Hand Rule for vector cross products. An index finger points for vector a, middle finger for vector b, and the thumb points upwards representing the resulting vector (a x b), which is perpendicular to the plane formed by a and b.",
+    "image_path": "right_hand_rule.jpg",
+    "timestamp_hours_ago": 190.2
+  },
+  {
+    "id": 50,
+    "url": "https://tum.de/course/cs/web/cookies_vs_sessions",
+    "type": "text",
+    "content": "Cookies and Sessions are used to store user information for web applications. A Cookie is a small piece of data stored on the client-side (browser), while a Session is stored on the server-side. Sessions are generally more secure than cookies because critical data is not exposed to the client.",
+    "timestamp_hours_ago": 12.1
+  }
+]

@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+python-multipart
+qdrant-client
+torch --index-url https://download.pytorch.org/whl/cpu
+transformers
+pillow
+numpy
+requests
+beautifulsoup4
+maturin
+python-dotenv
