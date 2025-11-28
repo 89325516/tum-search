@@ -13,3 +13,5 @@ tests/business_logic/
 # Rust build artifacts
 target/
 visual_rank_engine/target/
+*.log
+*.pid
