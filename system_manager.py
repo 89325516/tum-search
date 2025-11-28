@@ -38,7 +38,7 @@ SPACE_X = "tum_space_x"
 NOVELTY_THRESHOLD = 0.2  # 距离大于 0.2 (相似度 < 0.8) 视为独特，自动晋升
 # =========================================
 
-print("系统初始化: 连接数据库 & 加载模型...")
+print("🛠️System Initialization: Connecting to database & loading models...")
 client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
@@ -92,7 +92,7 @@ class SystemManager:
                         "clip": models.VectorParams(size=512, distance=models.Distance.COSINE)
                     }
                 )
-                print(f"✅ 集合 {name} 创建成功!")
+                print(f"✅ Collection {name} created successfully!")
 
     def _ensure_indices(self):
         """Ensure necessary payload indices exist."""
@@ -133,7 +133,7 @@ class SystemManager:
 
     def trigger_global_recalculation(self):
         """触发基于 HNSW 结构的立体 PageRank 计算"""
-        print("\n⚡️ 触发立体网络重算 (HNSW-based Recalculation) ⚡️")
+        print("\n⚡️ Triggering 3D Network Recalculation (HNSW-based Recalculation) ⚡️")
 
         # 1. 拉取 R 空间数据
         r_points = []
@@ -144,11 +144,11 @@ class SystemManager:
             if offset is None: break
 
         if not r_points:
-            print("   ⚠️ Space R 为空，无需计算。")
+            print("   ⚠️ Space R is empty, no calculation needed.")
             return
 
         self.r_cache = r_points
-        print(f"   -> Space R 当前节点总数: {len(r_points)}")
+        print(f"   -> Space R Total Nodes: {len(r_points)}")
 
         # 2. 构建立体图并计算 PR
         self._calculate_hnsw_pagerank(r_points)
@@ -236,15 +236,15 @@ class SystemManager:
             url: 目标 URL
             trigger_recalc: 是否立即触发全局重算 (批量导入时建议设为 False)
         """
-        print(f"\n🤖 开始处理 URL: {url}")
+        print(f"\n🤖 Processing URL: {url}")
 
         # 1. 爬取
         data = crawler.parse(url)
         if not data:
-            print("   ❌ 爬取失败或内容被过滤")
+            print("   ❌ Crawl failed or content filtered")
             return
 
-        print(f"   -> 爬取成功！获取了 {len(data['texts'])} 个有效文本块 (经过熵值清洗)。")
+        print(f"   -> ✅🐛🕸️Crawl successful! Retrieved {len(data['texts'])} valid text blocks (Entropy Cleaned).")
 
         promoted_count = 0
 
@@ -259,8 +259,8 @@ class SystemManager:
 
             if is_novel:
                 # 只有足够独特的知识才会被晋升到 R 空间
-                print(f"   🌟 [NOVELTY DETECTED] 发现新知识 (距离 {dist:.3f} > {NOVELTY_THRESHOLD}) -> 晋升 Space R")
-                print(f"      内容摘要: {text[:40]}...")
+                print(f"   🌟 [NOVELTY DETECTED] New knowledge found (Distance {dist:.3f} > {NOVELTY_THRESHOLD}) -> Promoted to Space R")
+                print(f"      Content Summary: {text[:40]}...")
 
                 pt_id = str(uuid.uuid4())
                 client.upsert(
@@ -284,7 +284,7 @@ class SystemManager:
                 )]
             )
 
-        print(f"   ✅ URL 处理完成。共有 {promoted_count} 个条目晋升为'元老' (Anchors)。")
+        print(f"   ✅ URL processing complete. {promoted_count} items promoted to Anchors.")
 
     def add_to_space_x(self, text, url=None, promote_to_r=False, is_summarized=False, **kwargs):
         """
@@ -292,7 +292,7 @@ class SystemManager:
         """
         if not text: return
         
-        print(f"📥 添加内容到 Space X: {url or 'Text Upload'}")
+        print(f"📥 Adding content to Space X: {url or 'Text Upload'}")
 
         # 1. 生成向量 (CLIP Text Encoder)
         vec = self.get_text_embedding(text)
@@ -315,11 +315,11 @@ class SystemManager:
             collection_name=SPACE_X,
             points=[models.PointStruct(id=pt_id, vector={"clip": vec}, payload=payload)]
         )
-        print(f"   ✅ 已添加到 Space X (ID: {pt_id})")
+        print(f"   ✅ Added to Space X (ID: {pt_id})")
 
         # 4. (可选) 晋升到 R
         if promote_to_r:
-            print("   -> 🚀 强制晋升到 Space R")
+            print("   -> 🚀 Force promotion to Space R")
             client.upsert(
                 collection_name=SPACE_R,
                 points=[models.PointStruct(id=pt_id, vector={"clip": vec}, payload=payload)]
@@ -331,7 +331,7 @@ class SystemManager:
         if not self.r_cache: return
 
         # 这里为了演示不打印太多刷屏
-        # print("   -> 更新 Space X 分数 (投影计算)...")
+        # print("   -> Updating Space X scores (projection calculation)...")
 
         r_vecs = np.array([p.vector['clip'] for p in self.r_cache])
         r_scores = np.array([self.r_ranks[p.id] for p in self.r_cache])
@@ -390,7 +390,7 @@ class SystemManager:
             collection_name=collection_name,
             points_selector=models.PointIdsList(points=[point_id])
         )
-        print(f"🗑️ 已从 {collection_name} 删除 ID: {point_id}")
+        print(f"🗑️ Deleted ID from {collection_name}: {point_id}")
         # 如果删的是 R 空间，必须触发重算
         if collection_name == SPACE_R:
             self.trigger_global_recalculation()
@@ -417,7 +417,7 @@ class SystemManager:
                 payload={**point.payload, "promoted_by_admin": True}
             )]
         )
-        print(f"⬆️ 管理员手动晋升 ID: {point_id}")
+        print(f"⬆️ Admin manually promoted ID: {point_id}")
 
         # 3. 触发重算
         self.trigger_global_recalculation()

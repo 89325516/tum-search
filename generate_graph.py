@@ -16,7 +16,7 @@ def generate_edges():
         with open(json_path, 'r', encoding='utf-8') as f:
             data = json.load(f)
     except FileNotFoundError:
-        print(f"错误：找不到文件 {json_path}。请确保你先完成了第2步创建了json文件。")
+        print(f"😅Error: File {json_path} not found. Please ensure you have completed step 2 to create the json file.")
         return
 
     ids = [item['id'] for item in data]
@@ -25,7 +25,7 @@ def generate_edges():
 
     edges = []
 
-    print(f"正在为 {len(ids)} 个内容节点生成模拟跳转关系...")
+    print(f"⚙️Generating simulated transition relationships for {len(ids)} content nodes...")
 
     # 2. 模拟逻辑
     for _ in range(num_edges):
@@ -57,8 +57,8 @@ def generate_edges():
         writer.writerow(['source_id', 'target_id'])  # 表头
         writer.writerows(edges)
 
-    print(f"成功！已生成 {len(edges)} 条跳转关系，保存在: {csv_path}")
-    print("准备进入下一步：将数据上传至 Colab 进行向量化。")
+    print(f"✅Success! Generated {len(edges)} transition relationships, saved to: {csv_path}")
+    print("Ready for next step: Upload data to Colab for vectorization.")
 
 
 if __name__ == "__main__":

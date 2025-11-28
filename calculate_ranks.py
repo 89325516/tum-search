@@ -10,7 +10,7 @@ def run_pagerank():
         with open('mock_data/tum_content.json', 'r') as f:
             content_data = json.load(f)
     except FileNotFoundError:
-        print("❌ 找不到数据文件，请检查 mock_data 文件夹")
+        print("❌ Data file not found, please check mock_data folder")
         return
 
     # 2. 准备图数据 (Source -> Target)
@@ -28,7 +28,7 @@ def run_pagerank():
     for item in content_data:
         last_interactions[item['id']] = item.get('timestamp_hours_ago', 24.0)
 
-    print(f"🚀 正在调用 Rust 引擎计算 {num_nodes} 个节点的 Temporal PageRank...")
+    print(f"🚀 Calling Rust Engine to calculate Temporal PageRank for {num_nodes} nodes...")
 
     # 4. 调用 Rust 函数 [cite: 128]
     # 参数: num_nodes, edges, timestamps, damping(阻尼系数), decay(衰减系数), iterations
@@ -48,10 +48,10 @@ def run_pagerank():
     with open('mock_data/pagerank_scores.json', 'w') as f:
         json.dump(rank_dict, f)
 
-    print(f"✅ 计算完成！分数已保存至 mock_data/pagerank_scores.json")
+    print(f"✅ Calculation complete! Scores saved to mock_data/pagerank_scores.json")
     # 打印前5名看看
     top_5 = sorted(rank_dict.items(), key=lambda x: x[1], reverse=True)[:5]
-    print("🏆 最具权威性的前5个网页 ID:", top_5)
+    print("🏆 Top 5 Authoritative Page IDs:", top_5)
 
 if __name__ == "__main__":
     run_pagerank()

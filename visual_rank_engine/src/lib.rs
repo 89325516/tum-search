@@ -63,7 +63,7 @@ fn calculate_hnsw_pagerank(
             let j = neighbor.d_id;
             if i == j { continue; } // Skip self-loops in construction
 
-            // 1. Semantic Similarity (语义相似度)
+            // 1. Semantic Similarity
             let dist = neighbor.distance;
             let semantic_sim = (1.0_f32 - dist).max(0.0_f32) as f64;
 

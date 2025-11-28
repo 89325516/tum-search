@@ -9,7 +9,7 @@ from transformers import CLIPProcessor, CLIPModel
 TOP_K_ANCHORS = 50
 # =======================================
 
-print("正在构建'元老院' (Anchors Cache)...")
+print("⚙️Building 'Anchors Cache'...")
 
 # 1. 加载之前的计算结果
 try:
@@ -18,7 +18,7 @@ try:
     with open('mock_data/tum_content.json', 'r') as f:
         content_list = json.load(f)
 except FileNotFoundError:
-    print("❌ 错误：找不到数据文件。请确保 mock_data 文件夹下有 pagerank_scores.json 和 tum_content.json")
+    print("❌ Error: Data files not found. Please ensure pagerank_scores.json and tum_content.json exist in mock_data folder")
     exit()
 
 # 将内容转为字典方便查找
@@ -30,14 +30,14 @@ sorted_ids = sorted([int(k) for k in scores.keys()], key=lambda k: scores[str(k)
 valid_anchors_ids = [aid for aid in sorted_ids if aid in content_dict][:TOP_K_ANCHORS]
 
 # 3. 加载 CLIP 模型 (CPU模式)
-print("正在加载 CLIP 模型...")
+print("⚙️Loading CLIP model...")
 device = "cpu"
 model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32").to(device)
 processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
 anchors = []
 
-print(f"正在计算 {len(valid_anchors_ids)} 个锚点的向量指纹...")
+print(f"🧮Calculating vector fingerprints for {len(valid_anchors_ids)} anchors...")
 
 for aid in valid_anchors_ids:
     item = content_dict.get(aid)
@@ -71,7 +71,7 @@ for aid in valid_anchors_ids:
 if anchors:
     with open('mock_data/anchors.pkl', 'wb') as f:
         pickle.dump(anchors, f)
-    print(f"✅ '元老院'构建完成！已保存 {len(anchors)} 个锚点至 mock_data/anchors.pkl")
-    print("💡 下一步：请运行 Step 2 (ingest_data.py) 来测试新数据入库和实时打分。")
+    print(f"✅ 'Anchors Cache' built successfully! Saved {len(anchors)} anchors to mock_data/anchors.pkl")
+    print("💡 Next Step: Run Step 2 (ingest_data.py) to test new data ingestion and real-time scoring.")
 else:
-    print("❌ 警告：生成的锚点列表为空，请检查 pagerank_scores.json 是否有数据。")
+    print("❌ Warning: Generated anchor list is empty, please check if pagerank_scores.json has data.")

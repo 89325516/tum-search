@@ -61,7 +61,7 @@ def background_process_content(task_type: str, content: str = None, file_path: s
     后台执行：爬取/入库 -> 独特性检测 -> (可能) HNSW重算 -> 发送通知
     """
     start_time = time.time()
-    print(f"⏳ [AsyncTask] 开始处理任务: {task_type}")
+    print(f"⏳ [AsyncTask] Starting task: {task_type}")
 
     try:
         # 执行具体逻辑
@@ -111,7 +111,7 @@ def background_process_content(task_type: str, content: str = None, file_path: s
             "message": notification_msg,
             "timestamp": timestamp
         }))
-        print("✅ [AsyncTask] 通知已发送。")
+        print("✅ [AsyncTask] Notification sent.")
 
     except Exception as e:
         print(f"❌ [AsyncTask] Error: {e}")

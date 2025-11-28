@@ -23,14 +23,14 @@ QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 SPACE_X = "tum_space_x"
 # =========================================
 
-print("正在初始化搜索引擎...")
+print("🛠️Initializing Search Engine...")
 
 # 1. 连接 Qdrant
-print("正在连接 Qdrant 数据库...")
+print("🔗Connecting to Qdrant Database...")
 client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 
 # 2. 加载本地 CLIP (CPU模式)
-print("正在加载本地 CLIP 模型 (CPU模式)...")
+print("⚙️Loading local CLIP model (CPU mode)...")
 clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
@@ -45,7 +45,7 @@ def gauss_rank_norm(scores):
 
 # --- 核心搜索函数 ---
 def search(query_text, top_k=10):
-    print(f"\n🔍 正在搜索: '{query_text}' ...")
+    print(f"\n🔍 Searching for: '{query_text}' ...")
 
     # ---------------------------------------------------------
     # Layer 1: Vector Embedding (CLIP)
@@ -68,7 +68,7 @@ def search(query_text, top_k=10):
             limit=top_k * 3  # 多取一些用于重排
         ).points
     except Exception as e:
-        print(f"❌ Qdrant 搜索失败: {e}")
+        print(f"❌ Qdrant search failed: {e}")
         return []
 
     # ---------------------------------------------------------
@@ -95,7 +95,7 @@ def search(query_text, top_k=10):
         )
         
         if not is_consistent:
-            print(f"🛡️ [熔断] 屏蔽 ID {hit_id}: 语义-视觉冲突过大 (Loss: {conflict_loss:.2f})")
+            print(f"🛡️ [Circuit Breaker] Blocked ID {hit_id}: High Semantic-Visual Conflict (Loss: {conflict_loss:.2f})")
             continue
 
         raw_sims.append(sim)
@@ -145,7 +145,7 @@ def search(query_text, top_k=10):
     # --- 第三道防线 (B)：探索红利 (Exploration Bonus) ---
     # 随机插入新内容 (Bandit 算法)
     if random.random() < 0.05: # 5% 概率触发
-        print("🎲 [探索] 触发探索机制，注入新内容...")
+        print("🎲 [Exploration] Triggering exploration mechanism, injecting new content...")
         # 这里简单模拟：随机取一个低分结果提升到第 2 名
         if len(final_ranked) > 5:
             lucky_idx = random.randint(5, len(final_ranked)-1)
@@ -164,7 +164,7 @@ def display_results(results):
     print("=" * 40)
 
     if not results:
-        print("没有找到结果。")
+        print("No results found.")
         return
 
     for i, res in enumerate(results[:5]):

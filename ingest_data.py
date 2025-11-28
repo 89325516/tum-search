@@ -21,7 +21,7 @@ COLLECTION_NAME = "tum_data"
 # =========================================
 
 # 1. 加载资源 (模型 + 锚点)
-print("正在初始化入库管道 (Ingestion Pipeline)...")
+print("⚙️Initializing Ingestion Pipeline...")
 clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 
@@ -29,9 +29,9 @@ clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
 try:
     with open('mock_data/anchors.pkl', 'rb') as f:
         ANCHORS = pickle.load(f)
-    print(f"已加载 {len(ANCHORS)} 个锚点数据。")
+    print(f"Loaded {len(ANCHORS)} anchor data points.")
 except FileNotFoundError:
-    print("❌ 错误：未找到 anchors.pkl，请先运行 Step 1 的脚本。")
+    print("❌ Error: anchors.pkl not found. Please run Step 1 script first.")
     exit()
 
 
@@ -83,7 +83,7 @@ def get_clip_embedding(text=None, image_path=None):
             inputs = clip_processor(images=image, return_tensors="pt")
             feat = clip_model.get_image_features(**inputs)
         except Exception as e:
-            print(f"图片读取失败: {e}")
+            print(f"❌🌌Image read failed: {e}")
             return None
 
     if inputs is not None:
@@ -124,13 +124,13 @@ def upload_to_qdrant(points):
         resp = requests.put(url, headers=headers, json={"points": batch_points})
 
         if resp.status_code != 200:
-            print(f"❌ 服务器返回错误: {resp.status_code}")
+            print(f"❌ Server returned error: {resp.status_code}")
             print(resp.text)
         else:
-            print(f"✅ 成功入库 {len(points)} 条数据！(含实时打分)")
+            print(f"✅ Successfully ingested {len(points)} items! (With real-time scoring)")
 
     except Exception as e:
-        print(f"❌ 入库请求失败: {e}")
+        print(f"❌ Ingestion request failed: {e}")
 
 
 # --- 主入口函数：添加新内容 ---
@@ -139,7 +139,7 @@ def add_new_content(url, text_content=None, image_path=None):
 
     # 1. 处理文本部分
     if text_content:
-        print(f"处理文本: {text_content[:30]}...")
+        print(f"⚙️Processing text: {text_content[:30]}...")
         vec = get_clip_embedding(text=text_content)
         if vec is not None:
             pr_score = calculate_projected_score(vec)
@@ -155,11 +155,11 @@ def add_new_content(url, text_content=None, image_path=None):
                     "is_new": True
                 }
             })
-            print(f"   -> 文本计算得分: {pr_score:.6f}")
+            print(f"   -> ✅Text score: {pr_score:.6f}")
 
     # 2. 处理图像部分
     if image_path:
-        print(f"处理图片: {image_path}...")
+        print(f"⚙️Processing image: {image_path}...")
         vec = get_clip_embedding(image_path=image_path)
         if vec is not None:
             pr_score = calculate_projected_score(vec)
@@ -176,7 +176,7 @@ def add_new_content(url, text_content=None, image_path=None):
                     "is_new": True
                 }
             })
-            print(f"   -> 图片计算得分: {pr_score:.6f}")
+            print(f"   -> ✅🌌Image score: {pr_score:.6f}")
 
     # 3. 执行上传
     if points_to_upload:
@@ -186,7 +186,7 @@ def add_new_content(url, text_content=None, image_path=None):
 # --- 测试用例 ---
 if __name__ == "__main__":
     print("-" * 50)
-    print("模拟新数据进入系统...")
+    print("⚙️Simulating new data entering the system...")
 
     new_url = "https://google.com/search/pagerank_explained"
     new_text = "PageRank works by counting the number and quality of links to a page to determine a rough estimate of how important the website is."
