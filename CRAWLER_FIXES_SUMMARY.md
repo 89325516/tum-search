@@ -191,20 +191,65 @@ def _is_valid_url(self, url):
 ---
 
 #### 10. **图片扩展名检查改进** ✅
-**修复位置**: `extract_content_smart()` 方法
+**修复位置**: `extract_content_smart()` 和 `SmartCrawler.parse()` 方法
 
 **修复内容**:
 - 改进扩展名提取逻辑
-- 正确处理URL参数和fragment
+- 正确处理URL参数和fragment（使用 `.split('?')[0].split('#')[0]`）
 - 支持更多图片格式
+
+**代码改进**:
+```python
+# 改进的扩展名提取：移除查询参数和fragment
+ext = full_url.split('.')[-1].lower().split('?')[0].split('#')[0]
+```
+
+---
+
+#### 11. **编码检测改进** ✅
+**修复位置**: `SmartCrawler.parse()` 和 `OptimizedCrawler.fetch()` 方法
+
+**修复内容**:
+- SmartCrawler: 改进编码检测，尝试多种常见编码（utf-8, latin-1, iso-8859-1, cp1252）
+- OptimizedCrawler: 添加编码错误处理，如果aiohttp自动检测失败，手动尝试多种编码
+- 使用 `errors='replace'` 替代 `errors='ignore'`，避免静默忽略错误
+
+**代码改进**:
+```python
+# SmartCrawler: 尝试多种编码
+encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
+for encoding in encodings:
+    try:
+        html = response.content.decode(encoding)
+        break
+    except (UnicodeDecodeError, LookupError):
+        continue
+
+# OptimizedCrawler: aiohttp编码错误处理
+try:
+    return await response.text()
+except UnicodeDecodeError:
+    # 手动尝试多种编码
+    content = await response.read()
+    # ... 尝试多种编码 ...
+```
+
+---
+
+#### 12. **删除未使用的变量** ✅
+**修复位置**: `OptimizedCrawler.__init__()` 方法
+
+**修复内容**:
+- 删除未使用的 `MIN_TEXT_DENSITY` 变量
+- 清理冗余代码
 
 ---
 
 ## 📊 修复统计
 
 - ✅ **严重缺陷**: 5个全部修复
-- ✅ **中等缺陷**: 5个全部修复
-- ✅ **轻微缺陷**: 部分改进
+- ✅ **中等缺陷**: 9个全部修复（包括编码检测、图片扩展名检查等）
+- ✅ **轻微缺陷**: 2个修复（删除未使用变量、资源清理改进）
 
 ## 🎯 新增功能
 

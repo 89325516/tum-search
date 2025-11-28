@@ -143,11 +143,26 @@ class SmartCrawler:
             response = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
             response.raise_for_status()
 
-            # 自动检测编码
+            # 改进的编码检测：优先使用响应声明的编码，否则尝试检测
             if response.encoding:
-                html = response.text
+                try:
+                    html = response.text
+                except UnicodeDecodeError:
+                    # 如果声明的编码失败，尝试UTF-8
+                    html = response.content.decode('utf-8', errors='replace')
             else:
-                html = response.content.decode('utf-8', errors='ignore')
+                # 尝试多种常见编码
+                encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
+                html = None
+                for encoding in encodings:
+                    try:
+                        html = response.content.decode(encoding)
+                        break
+                    except (UnicodeDecodeError, LookupError):
+                        continue
+                if html is None:
+                    # 如果所有编码都失败，使用UTF-8并替换错误字符
+                    html = response.content.decode('utf-8', errors='replace')
 
             # 尝试使用lxml（更快），如果失败则回退到html.parser
             try:
@@ -162,8 +177,8 @@ class SmartCrawler:
                 src = img.get('src') or img.get('data-src')
                 if src and not src.startswith('data:'):
                     full_url = urljoin(url, src)
-                    # 简单过滤小图标和无效图片
-                    ext = full_url.split('.')[-1].lower().split('?')[0]
+                    # 改进的扩展名提取：移除查询参数和fragment
+                    ext = full_url.split('.')[-1].lower().split('?')[0].split('#')[0]
                     if ext in ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg']:
                         images.append(full_url)
 
@@ -301,7 +316,6 @@ class OptimizedCrawler:
         
         # 优化后的阈值
         # 熵值阈值：根据经验，英文/德文自然语言通常在 3.5 到 5.8 之间
-        self.MIN_TEXT_DENSITY = 0.3
         self.MIN_LENGTH = 30
         self.MIN_ENTROPY = 3.5
         self.MAX_ENTROPY = 6.5
@@ -512,8 +526,21 @@ class OptimizedCrawler:
                             # 记录最后访问的URL（用于Referer）
                             async with self._last_url_lock:
                                 self._last_url = url
-                            # 自动检测编码并读取
-                            return await response.text()
+                            # aiohttp会自动检测编码，但添加错误处理
+                            try:
+                                return await response.text()
+                            except UnicodeDecodeError:
+                                # 如果自动检测失败，尝试手动解码
+                                content = await response.read()
+                                # 尝试常见编码
+                                encodings = ['utf-8', 'latin-1', 'iso-8859-1', 'cp1252']
+                                for encoding in encodings:
+                                    try:
+                                        return content.decode(encoding)
+                                    except (UnicodeDecodeError, LookupError):
+                                        continue
+                                # 如果所有编码都失败，使用UTF-8并替换错误字符
+                                return content.decode('utf-8', errors='replace')
                         elif response.status in [301, 302, 303, 307, 308]:
                             # 处理重定向
                             redirect_url = response.headers.get('Location')
@@ -590,7 +617,8 @@ class OptimizedCrawler:
                 continue
             
             full_url = urljoin(url, src)
-            ext = full_url.split('.')[-1].lower().split('?')[0]
+            # 改进的扩展名提取：移除查询参数和fragment
+            ext = full_url.split('.')[-1].lower().split('?')[0].split('#')[0]
             if ext in ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg']:
                 images.append(full_url)
 
