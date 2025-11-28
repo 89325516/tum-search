@@ -158,86 +158,58 @@ class SystemManager:
 
     def _calculate_hnsw_pagerank(self, points):
         """
-        构建 HNSW 立体分层图并计算 PageRank
+        构建 HNSW 立体分层图并计算 PageRank (Rust Accelerated)
         """
-        n = len(points)
-        vectors = np.array([p.vector['clip'] for p in points])
+        try:
+            import visual_rank_engine
+        except ImportError:
+            print("❌ Error: visual_rank_engine not found. Please build the Rust extension.")
+            return
 
-        # --- Step A: 基于交互的权重计算 (Interaction-based Weighting) ---
-        # 不再随机分配层级，而是根据“热度”决定节点引力
+        n = len(points)
+        if n == 0: return
         
-        # 1. 预热冷启动数据 (如果没有任何交互数据)
+        print(f"   ⚡️ Rust Engine: Calculating PageRank for {n} nodes...")
+        start_time = time.time()
+
+        # 1. Prepare Data
+        # Ensure IDs are strings
+        ids = [str(p.id) for p in points]
+        vectors = [p.vector['clip'] for p in points]
+        
+        # Cold start check
         if not self.interaction_mgr.interactions:
             self.interaction_mgr.simulate_cold_start_data(points)
 
-        # 2. 获取每个节点的交互权重
+        # Interaction Weights (Fix: Use ID instead of URL)
         interaction_weights = {}
         for p in points:
-            # Use URL as key because ID in R differs from ID in X
-            url_key = p.payload.get('url')
-            w = self.interaction_mgr.get_interaction_weight(url_key)
-            interaction_weights[p.id] = w # Store by ID for fast lookup in loop
+            w = self.interaction_mgr.get_interaction_weight(str(p.id))
+            interaction_weights[str(p.id)] = w
             
-        print(f"   -> 📊 交互权重加载完成。Max Weight: {max(interaction_weights.values()):.2f}")
+        # Transitions (Convert defaultdict to dict for safety)
+        # InteractionManager.transitions is defaultdict(lambda: defaultdict(int))
+        transitions = {k: dict(v) for k, v in self.interaction_mgr.transitions.items()}
 
-        # --- Step B: 构建邻接矩阵 (Topology Construction) ---
-        adj_matrix = np.zeros((n, n))
-
-        for i in range(n):
-            # 寻找邻居
-            candidates = [j for j in range(n) if i != j]
-            if not candidates: continue
-
-            cand_vectors = vectors[candidates]
-            sims = np.dot(cand_vectors, vectors[i])
-
-            # 选出最近的 M 个邻居 (语义相似)
-            k = min(self.m_neighbors, len(candidates))
-            top_k_indices = np.argsort(sims)[::-1][:k]
-
-            for local_idx in top_k_indices:
-                real_idx = candidates[local_idx]
-                target_id = points[real_idx].id
-                
-                # 语义相似度
-                semantic_sim = sims[local_idx]
-                
-                # 交互加权 (Target 的热度越高，这条边的权重越大)
-                # 逻辑：大家都喜欢引用（连接）热门内容
-                target_weight = interaction_weights.get(target_id, 1.0)
-                
-                # 转移加权 (Transitive Trust)
-                # 如果用户经常从 Source 跳转到 Target，那么这条边应该非常强
-                source_url = points[i].payload.get('url')
-                target_url = points[real_idx].payload.get('url')
-                transition_boost = self.interaction_mgr.get_transition_weight(source_url, target_url)
-                
-                # 最终边权重 = 语义相似度 * 目标热度 * 转移概率
-                final_weight = semantic_sim * target_weight * transition_boost
-                
-                adj_matrix[i][real_idx] = final_weight
-
-        # --- Step C: 运行 Power Iteration (Flow Calculation) ---
-        d = 0.85
-        ranks = np.ones(n) / n
-        for _ in range(30):
-            new_ranks = np.zeros(n)
-            for i in range(n):
-                incoming = np.where(adj_matrix[:, i] > 0)[0]
-                share = 0
-                for j in incoming:
-                    weight = adj_matrix[j][i]
-                    out_weight_sum = np.sum(adj_matrix[j])
-                    if out_weight_sum > 0:
-                        share += (ranks[j] * weight) / out_weight_sum
-                new_ranks[i] = (1 - d) / n + d * share
-            ranks = new_ranks
-
-        # 归一化并缓存
-        if np.sum(ranks) > 0:
-            ranks = ranks / np.sum(ranks)
-        self.r_ranks = {points[i].id: float(ranks[i]) for i in range(n)}
-        print("   -> ✅ HNSW PageRank 迭代计算完成。")
+        # 2. Call Rust
+        try:
+            ranks = visual_rank_engine.calculate_hnsw_pagerank(
+                ids,
+                vectors,
+                interaction_weights,
+                transitions,
+                self.m_neighbors,
+                0.85, # damping
+                30    # iterations
+            )
+            
+            self.r_ranks = ranks
+            print(f"   -> ✅ Rust calculation finished in {time.time() - start_time:.4f}s")
+            
+        except Exception as e:
+            print(f"   ❌ Rust Engine Failed: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _check_novelty(self, vector):
         """
@@ -598,8 +570,24 @@ class SystemManager:
 if __name__ == "__main__":
     mgr = SystemManager()
 
-    # 我们使用 PageRank 的维基百科页面，这个页面肯定存在
-    # 而且内容硬核，很容易触发独特性检测（如果你之前的锚点都是简单的模拟数据的话）
-    target_url = "https://en.wikipedia.org/wiki/PageRank"
-
-    mgr.process_url_and_add(target_url)
+    print("\n🧪 Injecting mock data to verify Rust Engine...")
+    # Inject some mock data into Space R to trigger calculation
+    mock_vec = [0.1] * 512
+    id1 = str(uuid.uuid4())
+    id2 = str(uuid.uuid4())
+    id3 = str(uuid.uuid4())
+    
+    mgr.client.upsert(
+        collection_name=SPACE_R,
+        points=[
+            models.PointStruct(id=id1, vector={"clip": mock_vec}, payload={"url": "http://a.com", "content": "A"}),
+            models.PointStruct(id=id2, vector={"clip": mock_vec}, payload={"url": "http://b.com", "content": "B"}),
+            models.PointStruct(id=id3, vector={"clip": mock_vec}, payload={"url": "http://c.com", "content": "C"}),
+        ]
+    )
+    
+    # Add interactions to verify weight passing
+    mgr.interaction_mgr.record_interaction(id1, "click")
+    
+    # Trigger Recalculation
+    mgr.trigger_global_recalculation()
