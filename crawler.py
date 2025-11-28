@@ -140,7 +140,7 @@ class SmartCrawler:
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1',
             }
-            response = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
+            response = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
             response.raise_for_status()
 
             # 改进的编码检测：优先使用响应声明的编码，否则尝试检测
