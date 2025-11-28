@@ -10,6 +10,7 @@ import re
 import requests
 import time
 import traceback
+import threading
 from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup, Comment
 from collections import Counter
@@ -358,7 +359,14 @@ class OptimizedCrawler:
         
         # URL缓存（用于避免重复爬取）
         self.url_cache = {}  # {url: result}
-        self.cache_lock = asyncio.Lock()
+        # 锁机制说明：
+        # - cache_lock (asyncio.Lock): 用于异步方法，保护异步代码之间的并发访问
+        # - cache_lock_sync (threading.Lock): 用于同步方法，保护跨线程访问
+        # 注意：虽然两个锁不能互相保护，但在实际使用中：
+        #   - 异步代码主要在单线程事件循环中运行，使用 asyncio.Lock 保护异步并发
+        #   - 同步方法可能在另一个线程中，使用 threading.Lock 保护跨线程访问
+        self.cache_lock = asyncio.Lock()  # 异步锁，用于异步方法
+        self.cache_lock_sync = threading.Lock()  # 同步锁，用于同步方法（修复竞态条件）
         
         # 爬取统计
         self.stats = {
@@ -1022,21 +1030,32 @@ class OptimizedCrawler:
             return None
 
     def get_stats(self):
-        """获取爬取统计信息"""
+        """获取爬取统计信息（同步方法，使用同步锁保护缓存读取）"""
         cache_hit_rate = 0
         if self.stats['total_requests'] + self.stats['cache_hits'] > 0:
             cache_hit_rate = self.stats['cache_hits'] / (self.stats['total_requests'] + self.stats['cache_hits'])
         
+        # 使用同步锁保护缓存大小读取，确保数据一致性
+        with self.cache_lock_sync:
+            cache_size = len(self.url_cache)
+        
         return {
             **self.stats,
             'cache_hit_rate': f"{cache_hit_rate:.2%}",
-            'cache_size': len(self.url_cache),
+            'cache_size': cache_size,
             'max_cache_size': self.max_cache_size
         }
     
-    def clear_cache(self):
-        """清空URL缓存"""
+    async def clear_cache(self):
+        """清空URL缓存（异步方法）"""
         async with self.cache_lock:
+            self.url_cache.clear()
+            logger.info("Cache cleared")
+    
+    def clear_cache_sync(self):
+        """清空URL缓存（同步方法，用于向后兼容）"""
+        # 使用同步锁保护，避免与异步方法产生竞态条件
+        with self.cache_lock_sync:
             self.url_cache.clear()
             logger.info("Cache cleared")
     
