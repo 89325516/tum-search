@@ -140,7 +140,7 @@ class SmartCrawler:
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1',
             }
-            response = requests.get(url, headers=headers, timeout=15, allow_redirects=True)
+            response = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
             response.raise_for_status()
 
             # 改进的编码检测：优先使用响应声明的编码，否则尝试检测
@@ -271,10 +271,12 @@ class SmartCrawler:
 
 class OptimizedCrawler:
     """
-    优化的异步爬虫类 - 支持批量并发处理
+    优化的异步爬虫类 - 支持批量并发处理和深度递归爬取
     提供高性能的异步爬取能力，同时保持与 SmartCrawler 兼容的返回格式
     """
-    def __init__(self, concurrency=5, timeout=10, delay=1.0, max_rate=None, max_redirects=5, verify_ssl=True):
+    def __init__(self, concurrency=5, timeout=10, delay=1.0, max_rate=None, max_redirects=5, verify_ssl=True, 
+                 enable_cache=True, max_cache_size=1000, same_domain_only=True, max_path_depth=None,
+                 exclude_static=True, exclude_extensions=None):
         """
         Args:
             concurrency: 并发数，防止封IP
@@ -283,6 +285,12 @@ class OptimizedCrawler:
             max_rate: 全局最大请求速率（每秒请求数），None表示不限制
             max_redirects: 最大重定向深度，防止无限循环
             verify_ssl: 是否验证SSL证书（默认True，生产环境建议启用）
+            enable_cache: 是否启用URL缓存，避免重复爬取
+            max_cache_size: 最大缓存大小（URL数量）
+            same_domain_only: 是否只爬取同一域名（深度爬取时）
+            max_path_depth: 最大路径深度限制（None表示不限制）
+            exclude_static: 是否排除静态资源文件
+            exclude_extensions: 要排除的文件扩展名列表（默认: pdf, jpg, png, gif, css, js等）
         """
         if HAS_FAKE_USERAGENT:
             self.ua = UserAgent()
@@ -332,6 +340,33 @@ class OptimizedCrawler:
             r'close menu|search navigation|reset search|all rights reserved|privacy policy|legal notice|cookie|accept|decline',
             re.IGNORECASE
         )
+        
+        # 深度爬取相关配置
+        self.enable_cache = enable_cache
+        self.max_cache_size = max_cache_size
+        self.same_domain_only = same_domain_only
+        self.max_path_depth = max_path_depth
+        self.exclude_static = exclude_static
+        
+        # 默认排除的静态资源扩展名
+        if exclude_extensions is None:
+            exclude_extensions = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', 
+                                  '.css', '.js', '.zip', '.tar', '.gz', '.xml', '.json',
+                                  '.mp4', '.mp3', '.avi', '.mov', '.wmv', '.flv',
+                                  '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx']
+        self.exclude_extensions = set(ext.lower() for ext in exclude_extensions)
+        
+        # URL缓存（用于避免重复爬取）
+        self.url_cache = {}  # {url: result}
+        self.cache_lock = asyncio.Lock()
+        
+        # 爬取统计
+        self.stats = {
+            'total_requests': 0,
+            'cache_hits': 0,
+            'cache_misses': 0,
+            'failed_requests': 0
+        }
 
     def _get_user_agent(self):
         """获取User-Agent"""
@@ -391,6 +426,71 @@ class OptimizedCrawler:
             return False
         
         return True
+    
+    def _is_valid_link_for_crawl(self, url, start_domain=None):
+        """
+        深度爬取时的链接过滤 - 更严格的验证
+        检查静态资源、路径深度、域名等
+        """
+        if not self._is_valid_url(url):
+            return False
+        
+        parsed = urlparse(url)
+        
+        # 域名过滤
+        if self.same_domain_only and start_domain:
+            if parsed.netloc != start_domain:
+                return False
+        
+        # 路径深度限制
+        if self.max_path_depth is not None:
+            path_parts = [p for p in parsed.path.split('/') if p]
+            if len(path_parts) > self.max_path_depth:
+                return False
+        
+        # 静态资源过滤
+        if self.exclude_static:
+            # 检查文件扩展名
+            path_lower = parsed.path.lower()
+            for ext in self.exclude_extensions:
+                if path_lower.endswith(ext):
+                    return False
+            
+            # 检查常见的静态资源路径模式
+            static_patterns = ['/static/', '/assets/', '/media/', '/files/', 
+                             '/downloads/', '/images/', '/img/', '/css/', '/js/']
+            if any(pattern in path_lower for pattern in static_patterns):
+                return False
+        
+        return True
+    
+    async def _get_from_cache(self, url):
+        """从缓存获取结果"""
+        if not self.enable_cache:
+            return None
+        
+        async with self.cache_lock:
+            if url in self.url_cache:
+                self.stats['cache_hits'] += 1
+                return self.url_cache[url]
+        
+        self.stats['cache_misses'] += 1
+        return None
+    
+    async def _add_to_cache(self, url, result):
+        """添加到缓存"""
+        if not self.enable_cache or result is None:
+            return
+        
+        async with self.cache_lock:
+            # 如果缓存已满，删除最旧的条目（简单的FIFO策略）
+            if len(self.url_cache) >= self.max_cache_size:
+                # 删除第一个（最旧的）条目
+                if self.url_cache:
+                    oldest_url = next(iter(self.url_cache))
+                    del self.url_cache[oldest_url]
+            
+            self.url_cache[url] = result
     
     async def _get_headers(self, url=None):
         """获取完整的HTTP Headers，更像真实浏览器"""
@@ -622,7 +722,7 @@ class OptimizedCrawler:
             if ext in ['jpg', 'jpeg', 'png', 'webp', 'gif', 'svg']:
                 images.append(full_url)
 
-        # 2. 提取链接（改进：过滤无效链接）
+        # 2. 提取链接（改进：使用增强的链接过滤）
         links = set()
         for a in soup.find_all('a', href=True):
             href = a['href']
@@ -636,13 +736,21 @@ class OptimizedCrawler:
             # 规范化URL
             normalized = self._normalize_url(full_link)
             if normalized and self._is_valid_url(normalized):
+                # 使用增强的链接过滤（如果提供了域名，会进行更严格的检查）
+                # 这里只做基本验证，深度爬取时会使用 _is_valid_link_for_crawl
                 links.add(normalized)
 
-        # 3. 提取文本 (核心优化：基于块的提取)
+        # 3. 提取文本 (核心优化：基于块的提取，支持更多内容类型)
         text_blocks = []
         
-        # 优先提取正文相关的标签
-        for tag in soup.find_all(['p', 'article', 'main', 'section', 'div', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+        # 提取标题（保留层次结构信息）
+        for tag in soup.find_all(['h1', 'h2', 'h3', 'h4', 'h5', 'h6']):
+            text = tag.get_text(strip=True, separator=' ')
+            if text and len(text) >= 10:  # 标题可以短一些
+                text_blocks.append(text)
+        
+        # 提取段落和主要内容标签
+        for tag in soup.find_all(['p', 'article', 'main', 'section', 'div']):
             text = tag.get_text(strip=True, separator=' ')
             
             # 过滤UI短语
@@ -657,6 +765,44 @@ class OptimizedCrawler:
             entropy = self.fast_entropy(text)
             if self.MIN_ENTROPY <= entropy <= self.MAX_ENTROPY:
                 text_blocks.append(text)
+        
+        # 提取列表项（li标签）- 通常包含有用信息
+        for tag in soup.find_all(['li']):
+            text = tag.get_text(strip=True, separator=' ')
+            # 列表项可以稍短
+            if len(text) >= 20 and len(text) < 500:  # 避免过长的列表项
+                if self.ui_phrases.search(text):
+                    continue
+                entropy = self.fast_entropy(text)
+                if self.MIN_ENTROPY <= entropy <= self.MAX_ENTROPY:
+                    text_blocks.append(text)
+        
+        # 提取表格内容（td标签）- 某些表格可能包含重要数据
+        for tag in soup.find_all(['td', 'th']):
+            text = tag.get_text(strip=True, separator=' ')
+            if len(text) >= 15 and len(text) < 300:
+                if self.ui_phrases.search(text):
+                    continue
+                entropy = self.fast_entropy(text)
+                if self.MIN_ENTROPY <= entropy <= self.MAX_ENTROPY:
+                    text_blocks.append(text)
+        
+        # 提取代码块中的注释和文档字符串（code, pre标签）
+        for tag in soup.find_all(['code', 'pre']):
+            text = tag.get_text(strip=True)
+            # 代码块通常较长，但我们只提取相对短的代码片段或注释
+            if len(text) >= 30 and len(text) < 200:
+                # 检查是否主要是注释或文档
+                if '//' in text or '/*' in text or '#' in text or '"""' in text:
+                    text_blocks.append(text)
+        
+        # 提取块引用（blockquote）- 通常包含重要引用
+        for tag in soup.find_all(['blockquote']):
+            text = tag.get_text(strip=True, separator=' ')
+            if len(text) >= self.MIN_LENGTH:
+                entropy = self.fast_entropy(text)
+                if self.MIN_ENTROPY <= entropy <= self.MAX_ENTROPY:
+                    text_blocks.append(text)
 
         # 去重但保留顺序
         text_blocks = list(dict.fromkeys(text_blocks))
@@ -671,18 +817,36 @@ class OptimizedCrawler:
         }
 
     async def process_url(self, session, url):
-        """单个 URL 的处理流"""
-        html = await self.fetch(session, url)
+        """单个 URL 的处理流 - 支持缓存"""
+        # 规范化URL
+        normalized_url = self._normalize_url(url)
+        if not normalized_url:
+            return None
+        
+        # 检查缓存
+        cached_result = await self._get_from_cache(normalized_url)
+        if cached_result is not None:
+            logger.debug(f"Cache hit for {normalized_url}")
+            return cached_result
+        
+        # 统计
+        self.stats['total_requests'] += 1
+        
+        html = await self.fetch(session, normalized_url)
         if not html:
+            self.stats['failed_requests'] += 1
             return None
 
         # 将 CPU 密集型的解析任务放到线程池中，避免阻塞 Event Loop
         loop = asyncio.get_running_loop()
         try:
-            result = await loop.run_in_executor(self.executor, self._parse_sync, html, url)
+            result = await loop.run_in_executor(self.executor, self._parse_sync, html, normalized_url)
+            # 添加到缓存
+            await self._add_to_cache(normalized_url, result)
             return result
         except Exception as e:
-            logger.error(f"Parse error {url}: {e}")
+            logger.error(f"Parse error {normalized_url}: {e}")
+            self.stats['failed_requests'] += 1
             return None
 
     def _parse_sync(self, html, url):
@@ -722,6 +886,109 @@ class OptimizedCrawler:
             
             return valid_results
 
+    async def crawl_recursive(self, start_url: str, max_depth: int = 3, max_pages: Optional[int] = None,
+                              callback=None, same_domain_only: Optional[bool] = None) -> List[Dict]:
+        """
+        深度递归爬取 - 使用BFS算法按层爬取
+        
+        Args:
+            start_url: 起始URL
+            max_depth: 最大爬取深度（0表示只爬取起始URL）
+            max_pages: 最大爬取页面数（None表示不限制）
+            callback: 回调函数 callback(count, url, result) 在每个页面爬取完成后调用
+            same_domain_only: 是否只爬取同一域名（None表示使用初始化时的设置）
+        
+        Returns:
+            所有爬取结果列表
+        """
+        if same_domain_only is None:
+            same_domain_only = self.same_domain_only
+        
+        # 规范化起始URL
+        start_url = self._normalize_url(start_url)
+        if not start_url:
+            logger.error(f"Invalid start URL: {start_url}")
+            return []
+        
+        parsed_start = urlparse(start_url)
+        start_domain = parsed_start.netloc
+        
+        visited = set()  # 已访问的URL集合
+        queue = [(start_url, 0)]  # (url, depth) 队列，BFS
+        results = []
+        count = 0
+        
+        logger.info(f"🚀 Starting recursive crawl from {start_url} (max_depth={max_depth}, max_pages={max_pages or 'unlimited'})")
+        
+        async with aiohttp.ClientSession() as session:
+            while queue:
+                # 检查是否达到最大页面数限制
+                if max_pages and count >= max_pages:
+                    logger.info(f"Reached max_pages limit: {max_pages}")
+                    break
+                
+                # 获取当前层的所有URL（同一深度的URL）
+                current_level = []
+                current_depth = queue[0][1] if queue else -1
+                
+                # 收集同一深度的所有URL
+                while queue and queue[0][1] == current_depth:
+                    url, depth = queue.pop(0)
+                    if url not in visited:
+                        visited.add(url)
+                        current_level.append((url, depth))
+                
+                if not current_level:
+                    break
+                
+                # 并发爬取当前层的所有URL
+                tasks = [self.process_url(session, url) for url, _ in current_level]
+                level_results = await asyncio.gather(*tasks, return_exceptions=True)
+                
+                # 处理当前层的结果
+                for i, (url, depth) in enumerate(current_level):
+                    result = level_results[i]
+                    
+                    if isinstance(result, Exception):
+                        logger.error(f"Error processing {url}: {result}")
+                        continue
+                    
+                    if result is None:
+                        continue
+                    
+                    results.append(result)
+                    count += 1
+                    
+                    # 调用回调函数
+                    if callback:
+                        try:
+                            callback(count, url, result)
+                        except Exception as e:
+                            logger.warning(f"Callback error for {url}: {e}")
+                    
+                    logger.info(f"[{count}] Depth {depth}: {url} - Found {len(result.get('texts', []))} text blocks, {len(result.get('links', []))} links")
+                    
+                    # 如果还有深度，收集下一层的链接
+                    if depth < max_depth:
+                        links = result.get('links', [])
+                        for link in links:
+                            # 规范化链接
+                            normalized_link = self._normalize_url(link)
+                            if not normalized_link:
+                                continue
+                            
+                            # 使用增强的链接过滤
+                            if self._is_valid_link_for_crawl(normalized_link, start_domain if same_domain_only else None):
+                                if normalized_link not in visited:
+                                    # 避免重复添加到队列
+                                    if not any(nl == normalized_link for nl, _ in queue):
+                                        queue.append((normalized_link, depth + 1))
+                
+                logger.info(f"Completed depth {current_depth}: processed {len(current_level)} pages, found {len(queue)} URLs for next level")
+        
+        logger.info(f"✅ Recursive crawl finished. Processed {count} pages in total.")
+        return results
+
     def parse(self, url: str) -> Optional[Dict]:
         """
         同步接口 - 兼容 SmartCrawler.parse()
@@ -754,6 +1021,25 @@ class OptimizedCrawler:
             logger.error(f"Error in parse({url}): {e}")
             return None
 
+    def get_stats(self):
+        """获取爬取统计信息"""
+        cache_hit_rate = 0
+        if self.stats['total_requests'] + self.stats['cache_hits'] > 0:
+            cache_hit_rate = self.stats['cache_hits'] / (self.stats['total_requests'] + self.stats['cache_hits'])
+        
+        return {
+            **self.stats,
+            'cache_hit_rate': f"{cache_hit_rate:.2%}",
+            'cache_size': len(self.url_cache),
+            'max_cache_size': self.max_cache_size
+        }
+    
+    def clear_cache(self):
+        """清空URL缓存"""
+        async with self.cache_lock:
+            self.url_cache.clear()
+            logger.info("Cache cleared")
+    
     def close(self):
         """显式关闭资源（推荐使用）"""
         if hasattr(self, 'executor'):
