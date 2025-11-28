@@ -34,6 +34,13 @@ WORKDIR /app
 # 8. 创建必要的文件夹 (防止运行时报错)
 RUN mkdir -p temp_uploads static mock_data
 
+# 8.1 设置环境变量 (无缓冲日志)
+ENV PYTHONUNBUFFERED=1
+
+# 8.2 生成数据参数 (分离模式：依靠源代码生成 .pkl)
+# 注意：这需要 mock_data/pagerank_scores.json 和 tum_content.json 已经存在
+RUN python prepare_anchors.py
+
 # 9. 暴露端口 (Hugging Face 默认监听 7860)
 EXPOSE 7860
 

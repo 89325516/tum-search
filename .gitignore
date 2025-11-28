@@ -4,6 +4,12 @@ __pycache__/
 *.pyc
 .idea/
 .venv/
-.venv/
 tests/business_logic/
-.venv/
+
+# Compiled binaries
+*.so
+*.pkl
+
+# Rust build artifacts
+target/
+visual_rank_engine/target/
