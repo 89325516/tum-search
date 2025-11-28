@@ -262,7 +262,12 @@ if args.mode == "user":
     
     @app.get("/")
     async def get_user_ui():
-        return FileResponse('static/index.html')
+        response = FileResponse('static/index.html')
+        # 添加缓存控制头，确保页面更新后能立即看到效果
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+        return response
 
     @app.get("/api/feed")
     async def api_feed(limit: int = 20, offset: str = None):

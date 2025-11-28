@@ -268,117 +268,167 @@
         // ==========================================
         // 3D PARTICLE NETWORK BACKGROUND
         // ==========================================
-        (function() {
-            const canvas = document.getElementById('particle-canvas');
-            if (!canvas) return;
-            
-            const ctx = canvas.getContext('2d');
-            let animationFrameId;
-            let width, height;
-            let particles = [];
-
-            const particleCount = 60;
-            const connectionDistance = 150;
-            const mouseDistance = 200;
-            let mouse = { x: null, y: null };
-
-            const resize = () => {
-                width = window.innerWidth;
-                height = window.innerHeight;
-                canvas.width = width;
-                canvas.height = height;
-                initParticles();
-            };
-
-            class Particle {
-                constructor() {
-                    this.x = Math.random() * width;
-                    this.y = Math.random() * height;
-                    this.vx = (Math.random() - 0.5) * 0.5;
-                    this.vy = (Math.random() - 0.5) * 0.5;
-                    this.size = Math.random() * 2 + 1;
-                    this.color = `rgba(${Math.random() * 50 + 100}, ${Math.random() * 100 + 155}, 255, ${Math.random() * 0.5 + 0.2})`;
+        // 确保DOM加载完成后再初始化粒子效果
+        // 使用立即执行函数，如果DOM已加载则立即执行，否则等待DOMContentLoaded
+        (function initParticleNetwork() {
+            function startParticleNetwork() {
+                const canvas = document.getElementById('particle-canvas');
+                if (!canvas) {
+                    console.error('Particle canvas not found!');
+                    return;
                 }
+                
+                try {
+                    const ctx = canvas.getContext('2d');
+                    if (!ctx) {
+                        console.error('Failed to get 2D context from canvas');
+                        return;
+                    }
+                    
+                    let animationFrameId;
+                    let width, height;
+                    let particles = [];
 
-                update() {
-                    this.x += this.vx;
-                    this.y += this.vy;
-                    if (this.x < 0 || this.x > width) this.vx *= -1;
-                    if (this.y < 0 || this.y > height) this.vy *= -1;
+                    const particleCount = 60;
+                    const connectionDistance = 150;
+                    const mouseDistance = 200;
+                    let mouse = { x: null, y: null };
 
-                    if (mouse.x != null) {
-                        let dx = mouse.x - this.x;
-                        let dy = mouse.y - this.y;
-                        let distance = Math.sqrt(dx * dx + dy * dy);
-                        if (distance < mouseDistance) {
-                            const forceDirectionX = dx / distance;
-                            const forceDirectionY = dy / distance;
-                            const force = (mouseDistance - distance) / mouseDistance;
-                            this.vx += forceDirectionX * force * 0.6;
-                            this.vy += forceDirectionY * force * 0.6;
+                    const resize = () => {
+                        width = window.innerWidth;
+                        height = window.innerHeight;
+                        canvas.width = width;
+                        canvas.height = height;
+                        initParticles();
+                    };
+
+                    class Particle {
+                        constructor() {
+                            this.x = Math.random() * width;
+                            this.y = Math.random() * height;
+                            this.vx = (Math.random() - 0.5) * 0.5;
+                            this.vy = (Math.random() - 0.5) * 0.5;
+                            this.size = Math.random() * 2 + 1;
+                            this.color = `rgba(${Math.random() * 50 + 100}, ${Math.random() * 100 + 155}, 255, ${Math.random() * 0.5 + 0.2})`;
+                        }
+
+                        update() {
+                            this.x += this.vx;
+                            this.y += this.vy;
+                            if (this.x < 0 || this.x > width) this.vx *= -1;
+                            if (this.y < 0 || this.y > height) this.vy *= -1;
+
+                            if (mouse.x != null) {
+                                let dx = mouse.x - this.x;
+                                let dy = mouse.y - this.y;
+                                let distance = Math.sqrt(dx * dx + dy * dy);
+                                if (distance < mouseDistance && distance > 0) {
+                                    const forceDirectionX = dx / distance;
+                                    const forceDirectionY = dy / distance;
+                                    const force = (mouseDistance - distance) / mouseDistance;
+                                    this.vx += forceDirectionX * force * 0.6;
+                                    this.vy += forceDirectionY * force * 0.6;
+                                }
+                            }
+                            
+                            // 限制速度
+                            const maxSpeed = 2.0;
+                            const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                            if (speed > maxSpeed) {
+                                this.vx = (this.vx / speed) * maxSpeed;
+                                this.vy = (this.vy / speed) * maxSpeed;
+                            }
+                        }
+
+                        draw() {
+                            ctx.beginPath();
+                            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                            ctx.fillStyle = this.color;
+                            ctx.fill();
                         }
                     }
-                }
 
-                draw() {
-                    ctx.beginPath();
-                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-                    ctx.fillStyle = this.color;
-                    ctx.fill();
+                    const initParticles = () => {
+                        particles = [];
+                        for (let i = 0; i < particleCount; i++) {
+                            particles.push(new Particle());
+                        }
+                    };
+
+                    const animate = () => {
+                        if (!ctx) return;
+                        
+                        ctx.clearRect(0, 0, width, height);
+                        
+                        // 绘制连接线
+                        for (let i = 0; i < particles.length; i++) {
+                            for (let j = i + 1; j < particles.length; j++) {
+                                let dx = particles[i].x - particles[j].x;
+                                let dy = particles[i].y - particles[j].y;
+                                let distance = Math.sqrt(dx * dx + dy * dy);
+
+                                if (distance < connectionDistance) {
+                                    ctx.beginPath();
+                                    ctx.strokeStyle = `rgba(100, 200, 255, ${1 - distance / connectionDistance})`;
+                                    ctx.lineWidth = 0.5;
+                                    ctx.moveTo(particles[i].x, particles[i].y);
+                                    ctx.lineTo(particles[j].x, particles[j].y);
+                                    ctx.stroke();
+                                }
+                            }
+                        }
+
+                        // 更新和绘制粒子
+                        particles.forEach(particle => {
+                            particle.update();
+                            particle.draw();
+                        });
+
+                        animationFrameId = requestAnimationFrame(animate);
+                    };
+
+                    const handleMouseMove = (e) => {
+                        mouse.x = e.clientX || e.x;
+                        mouse.y = e.clientY || e.y;
+                    };
+
+                    const handleMouseLeave = () => {
+                        mouse.x = null;
+                        mouse.y = null;
+                    };
+
+                    // 清理函数
+                    const cleanup = () => {
+                        window.removeEventListener('resize', resize);
+                        window.removeEventListener('mousemove', handleMouseMove);
+                        window.removeEventListener('mouseleave', handleMouseLeave);
+                        if (animationFrameId) {
+                            cancelAnimationFrame(animationFrameId);
+                        }
+                    };
+
+                    // 绑定事件
+                    window.addEventListener('resize', resize);
+                    window.addEventListener('mousemove', handleMouseMove);
+                    window.addEventListener('mouseleave', handleMouseLeave);
+
+                    // 启动动画
+                    resize();
+                    animate();
+                    
+                    console.log('Particle network initialized successfully');
+                } catch (error) {
+                    console.error('Error initializing particle network:', error);
                 }
             }
 
-            const initParticles = () => {
-                particles = [];
-                for (let i = 0; i < particleCount; i++) {
-                    particles.push(new Particle());
-                }
-            };
-
-            const animate = () => {
-                ctx.clearRect(0, 0, width, height);
-                
-                for (let i = 0; i < particles.length; i++) {
-                    for (let j = i + 1; j < particles.length; j++) {
-                        let dx = particles[i].x - particles[j].x;
-                        let dy = particles[i].y - particles[j].y;
-                        let distance = Math.sqrt(dx * dx + dy * dy);
-
-                        if (distance < connectionDistance) {
-                            ctx.beginPath();
-                            ctx.strokeStyle = `rgba(100, 200, 255, ${1 - distance / connectionDistance})`;
-                            ctx.lineWidth = 0.5;
-                            ctx.moveTo(particles[i].x, particles[i].y);
-                            ctx.lineTo(particles[j].x, particles[j].y);
-                            ctx.stroke();
-                        }
-                    }
-                }
-
-                particles.forEach(particle => {
-                    particle.update();
-                    particle.draw();
-                });
-
-                animationFrameId = requestAnimationFrame(animate);
-            };
-
-            const handleMouseMove = (e) => {
-                mouse.x = e.x;
-                mouse.y = e.y;
-            };
-
-            const handleMouseLeave = () => {
-                mouse.x = null;
-                mouse.y = null;
-            };
-
-            window.addEventListener('resize', resize);
-            window.addEventListener('mousemove', handleMouseMove);
-            window.addEventListener('mouseleave', handleMouseLeave);
-
-            resize();
-            animate();
+            // 如果DOM已加载，立即执行；否则等待DOMContentLoaded
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', startParticleNetwork);
+            } else {
+                // DOM已经加载完成
+                startParticleNetwork();
+            }
         })();
 
         // ==========================================
