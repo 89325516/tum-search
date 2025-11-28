@@ -11,3 +11,5 @@ crate-type = ["cdylib"]
 pyo3 = { version = "0.23.3", features = ["extension-module"] }
 hnsw_rs = "0.3.1"
 rand = "0.8.5" # 用于随机游走或初始化
+rayon = "1.10"
+
