@@ -11,3 +11,4 @@ beautifulsoup4
 maturin
 python-dotenv
 google-generativeai
+scipy
