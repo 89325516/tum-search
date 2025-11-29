@@ -74,24 +74,56 @@ def background_process_content(task_type: str, content: str = None, file_path: s
     try:
         # 执行具体逻辑
         if task_type == "url":
+            max_pages = 1000  # 最大页面数
+            current_count = 0
+            total_pages = max_pages  # 总数（使用max_pages作为估算）
+            
+            # 发送开始消息
+            asyncio.run(ws_manager.broadcast({
+                "type": "progress",
+                "task_type": "url",
+                "count": 0,
+                "total": total_pages,
+                "percent": 0,
+                "message": "Starting URL crawl...",
+                "current_url": url
+            }))
+            
             # Define callback to send progress via WebSocket
             async def progress_callback(count, current_url):
+                nonlocal current_count
+                current_count = count
+                percent = int((count / total_pages) * 100) if total_pages > 0 else 0
+                
+                # 截断URL显示（如果太长）
+                display_url = current_url
+                if len(display_url) > 50:
+                    display_url = display_url[:47] + "..."
+                
                 await ws_manager.broadcast({
                     "type": "progress",
+                    "task_type": "url",
                     "count": count,
-                    "message": f"Processed: {current_url}"
+                    "total": total_pages,
+                    "percent": min(percent, 100),  # 限制在100%以内
+                    "message": f"Processing page {count}/{total_pages}",
+                    "current_url": display_url
                 })
             
             # Run recursive crawl (启用数据库检查以跳过已存在的URL)
             # 增加爬取深度到8层，支持更深的内容发现，增加页面数量上限
-            mgr.process_url_recursive(url, max_depth=8, max_pages=1000, callback=lambda c, u: asyncio.run(progress_callback(c, u)), check_db_first=True)
+            mgr.process_url_recursive(url, max_depth=8, max_pages=max_pages, callback=lambda c, u: asyncio.run(progress_callback(c, u)), check_db_first=True)
             
             # Get total count
             total_count = mgr.client.count(collection_name=SPACE_X).count
             
+            # 发送完成消息，显示实际处理的页面数
             asyncio.run(ws_manager.broadcast({
                 "type": "system_update",
-                "message": f"✅ Recursive crawl finished. Processed {total_count} pages in total."
+                "task_type": "url",
+                "message": f"✅ URL crawl finished. Processed {current_count} pages.",
+                "count": current_count,
+                "total": total_count
             }))
         elif task_type == "text":
             # 简单文本处理，复用 add_to_space_x

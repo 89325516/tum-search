@@ -78,14 +78,19 @@
         class="fixed bottom-6 right-6 z-50 transform transition-all duration-300 translate-y-24 opacity-0">
         <div class="bg-slate-800/90 backdrop-blur-md rounded-xl shadow-xl border border-slate-700/50 p-4 w-80">
             <div class="flex items-center justify-between mb-2">
-                <h4 class="text-sm font-bold text-slate-100">Ingesting Knowledge...</h4>
-                <span id="progress-count" class="text-xs font-mono text-cyan-400 bg-cyan-500/20 px-2 py-0.5 rounded-full">0
-                    items</span>
+                <h4 class="text-sm font-bold text-slate-100" id="progress-title">Ingesting Knowledge...</h4>
+                <span id="progress-count" class="text-xs font-mono text-cyan-400 bg-cyan-500/20 px-2 py-0.5 rounded-full">0 items</span>
             </div>
-            <div class="w-full bg-slate-700/50 rounded-full h-1.5 mb-2 overflow-hidden">
+            <!-- Determinate Progress Bar (for URL crawling) -->
+            <div id="progress-bar-container" class="hidden w-full bg-slate-700/50 rounded-full h-2 mb-2 overflow-hidden">
+                <div id="progress-bar" class="bg-gradient-to-r from-cyan-500 to-blue-500 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+            <!-- Indeterminate Progress Bar (for other tasks) -->
+            <div id="progress-bar-indeterminate" class="w-full bg-slate-700/50 rounded-full h-1.5 mb-2 overflow-hidden">
                 <div class="bg-cyan-500 h-1.5 rounded-full animate-progress-indeterminate"></div>
             </div>
-            <p id="progress-detail" class="text-xs text-slate-400 truncate">Initializing crawler...</p>
+            <p id="progress-detail" class="text-xs text-slate-400 truncate">Initializing...</p>
+            <p id="progress-url" class="text-xs text-slate-500 truncate mt-1 hidden"></p>
         </div>
     </div>
 
@@ -630,6 +635,12 @@
         const progressDetail = document.getElementById('progress-detail');
         let progressTimer;
 
+        const progressBarContainer = document.getElementById('progress-bar-container');
+        const progressBar = document.getElementById('progress-bar');
+        const progressBarIndeterminate = document.getElementById('progress-bar-indeterminate');
+        const progressTitle = document.getElementById('progress-title');
+        const progressUrl = document.getElementById('progress-url');
+
         ws.onmessage = function (event) {
             const data = JSON.parse(event.data);
 
@@ -637,9 +648,37 @@
                 // Show toast
                 progressToast.classList.remove('translate-y-24', 'opacity-0');
 
-                // Update content
-                progressCount.textContent = `${data.count} items`;
-                progressDetail.textContent = data.details;
+                // Check if this is URL crawling progress with detailed info
+                if (data.task_type === 'url' && data.total !== undefined) {
+                    // Use determinate progress bar for URL crawling
+                    progressBarContainer.classList.remove('hidden');
+                    progressBarIndeterminate.classList.add('hidden');
+                    progressUrl.classList.remove('hidden');
+                    
+                    // Update progress bar
+                    const percent = Math.min(data.percent || 0, 100);
+                    progressBar.style.width = percent + '%';
+                    
+                    // Update title and count
+                    progressTitle.textContent = "Crawling URLs...";
+                    progressCount.textContent = `${data.count || 0}/${data.total || 0} (${percent}%)`;
+                    progressCount.className = "text-xs font-mono text-cyan-400 bg-cyan-500/20 px-2 py-0.5 rounded-full";
+                    
+                    // Update detail and URL
+                    progressDetail.textContent = data.message || `Processing page ${data.count || 0}`;
+                    if (data.current_url) {
+                        progressUrl.textContent = data.current_url;
+                    }
+                } else {
+                    // Use indeterminate progress bar for other tasks
+                    progressBarContainer.classList.add('hidden');
+                    progressBarIndeterminate.classList.remove('hidden');
+                    progressUrl.classList.add('hidden');
+                    
+                    progressTitle.textContent = "Ingesting Knowledge...";
+                    progressCount.textContent = `${data.count || 0} items`;
+                    progressDetail.textContent = data.details || data.message || "Processing...";
+                }
 
                 // Auto hide after inactivity
                 clearTimeout(progressTimer);
@@ -650,9 +689,27 @@
             else if (data.type === 'system_update') {
                 // Show completion message
                 progressToast.classList.remove('translate-y-24', 'opacity-0');
-                progressCount.textContent = "Done";
-                progressCount.className = "text-xs font-mono text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full";
-                progressDetail.textContent = "Synchronization Complete.";
+                
+                if (data.task_type === 'url') {
+                    // For URL tasks, show final count
+                    progressBarContainer.classList.remove('hidden');
+                    progressBarIndeterminate.classList.add('hidden');
+                    progressBar.style.width = '100%';
+                    progressTitle.textContent = "Crawl Complete!";
+                    progressCount.textContent = "Done";
+                    progressCount.className = "text-xs font-mono text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full";
+                    progressDetail.textContent = data.message || `Processed ${data.count || 0} pages`;
+                    progressUrl.classList.add('hidden');
+                } else {
+                    // For other tasks
+                    progressBarContainer.classList.add('hidden');
+                    progressBarIndeterminate.classList.remove('hidden');
+                    progressTitle.textContent = "Complete!";
+                    progressCount.textContent = "Done";
+                    progressCount.className = "text-xs font-mono text-emerald-400 bg-emerald-500/20 px-2 py-0.5 rounded-full";
+                    progressDetail.textContent = data.message || "Synchronization Complete.";
+                    progressUrl.classList.add('hidden');
+                }
 
                 // Refresh feeds
                 loadFeed();
