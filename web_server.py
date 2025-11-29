@@ -769,7 +769,32 @@ if args.mode == "user":
             raise HTTPException(status_code=403, detail="密码错误，爬取被拒绝")
         
         # 密码验证通过，开始处理
+        print(f"📨 [API] Received URL upload request: {url}")
+        print(f"📨 [API] Adding background task for URL processing...")
+        
+        # 确保background_tasks参数不为None
+        if background_tasks is None:
+            raise HTTPException(status_code=500, detail="Background tasks not available")
+        
         background_tasks.add_task(background_process_content, "url", url=url)
+        print(f"✅ [API] Background task added successfully")
+        
+        # 立即发送一个初始状态消息（如果WebSocket已连接）
+        if len(ws_manager.active_connections) > 0:
+            try:
+                await ws_manager.broadcast({
+                    "type": "progress",
+                    "task_type": "url",
+                    "count": 0,
+                    "total": 1000,
+                    "percent": 0,
+                    "message": "URL received, starting crawl...",
+                    "current_url": url
+                })
+                print(f"✅ [API] Initial progress message sent via WebSocket")
+            except Exception as e:
+                print(f"⚠️ [API] Failed to send initial progress message: {e}")
+        
         return {"status": "processing", "message": "URL received. Processing..."}
 
     @app.post("/api/upload/text")

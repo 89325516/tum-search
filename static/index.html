@@ -670,8 +670,12 @@
                 console.log('Processing progress message:', data);
 
                 // Check if this is URL crawling progress with detailed info
-                if (data.task_type === 'url' && data.total !== undefined) {
+                if (data.task_type === 'url') {
                     console.log('URL crawling progress detected, updating progress bar...');
+                    // 即使没有total，也要显示进度条
+                    const hasTotal = data.total !== undefined;
+                    
+                    if (hasTotal) {
                     // Use determinate progress bar for URL crawling
                     if (progressBarContainer) progressBarContainer.classList.remove('hidden');
                     if (progressBarIndeterminate) progressBarIndeterminate.classList.add('hidden');
@@ -695,6 +699,19 @@
                     if (progressDetail) progressDetail.textContent = data.message || `Processing page ${data.count || 0}`;
                     if (progressUrl && data.current_url) {
                         progressUrl.textContent = data.current_url;
+                    }
+                    } else {
+                        // URL task but no total yet, show indeterminate with message
+                        if (progressBarContainer) progressBarContainer.classList.add('hidden');
+                        if (progressBarIndeterminate) progressBarIndeterminate.classList.remove('hidden');
+                        if (progressUrl && data.current_url) {
+                            progressUrl.textContent = data.current_url;
+                            progressUrl.classList.remove('hidden');
+                        }
+                        
+                        if (progressTitle) progressTitle.textContent = "Starting Crawl...";
+                        if (progressCount) progressCount.textContent = "Initializing...";
+                        if (progressDetail) progressDetail.textContent = data.message || "Initializing crawler...";
                     }
                 } else {
                     // Use indeterminate progress bar for other tasks
