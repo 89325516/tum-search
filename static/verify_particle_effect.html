@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粒子效果验证</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: #0f172a;
+            font-family: monospace;
+            color: white;
+        }
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: #0f172a;
+            display: block !important;
+        }
+        .status {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 1000;
+        }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+        .warning { color: #fbbf24; }
+    </style>
+</head>
+<body>
+    <canvas id="particle-canvas"></canvas>
+    <div class="status">
+        <h3>粒子效果验证</h3>
+        <div id="status-text">检查中...</div>
+    </div>
+
+    <script>
+        const statusDiv = document.getElementById('status-text');
+        
+        function updateStatus(msg, type = 'info') {
+            const colors = {
+                success: '#4ade80',
+                error: '#f87171',
+                warning: '#fbbf24',
+                info: '#60a5fa'
+            };
+            statusDiv.innerHTML += `<div style="color: ${colors[type]}; margin: 5px 0;">${msg}</div>`;
+            console.log(`[Verify] ${msg}`);
+        }
+        
+        // 验证步骤
+        setTimeout(() => {
+            updateStatus('1. 检查Canvas元素...', 'info');
+            const canvas = document.getElementById('particle-canvas');
+            
+            if (!canvas) {
+                updateStatus('❌ Canvas元素不存在！', 'error');
+                return;
+            }
+            updateStatus('✅ Canvas元素存在', 'success');
+            
+            updateStatus('2. 检查Canvas尺寸...', 'info');
+            const rect = canvas.getBoundingClientRect();
+            if (rect.width === 0 || rect.height === 0) {
+                updateStatus(`⚠️ Canvas尺寸为0: ${rect.width}x${rect.height}`, 'warning');
+            } else {
+                updateStatus(`✅ Canvas尺寸: ${rect.width}x${rect.height}`, 'success');
+            }
+            
+            updateStatus('3. 检查2D上下文...', 'info');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                updateStatus('❌ 无法获取2D上下文', 'error');
+                return;
+            }
+            updateStatus('✅ 2D上下文可用', 'success');
+            
+            updateStatus('4. 测试绘制...', 'info');
+            ctx.fillStyle = 'rgba(0, 255, 0, 0.5)';
+            ctx.fillRect(50, 50, 100, 100);
+            updateStatus('✅ 测试绘制完成（应该看到绿色方块）', 'success');
+            
+            updateStatus('5. 初始化粒子效果...', 'info');
+            
+            // 简化的粒子效果
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            
+            let particles = [];
+            for (let i = 0; i < 30; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: (Math.random() - 0.5) * 2
+                });
+            }
+            
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                
+                particles.forEach(p => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+                    if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+                    
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, 2, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(100, 200, 255, 0.8)';
+                    ctx.fill();
+                });
+                
+                requestAnimationFrame(animate);
+            }
+            
+            setTimeout(() => {
+                animate();
+                updateStatus('✅ 粒子效果已启动！', 'success');
+                updateStatus('如果看到蓝色粒子在移动，说明一切正常！', 'success');
+            }, 500);
+            
+        }, 500);
+    </script>
+</body>
+</html>

@@ -253,9 +253,16 @@ const ResultCard = ({ item, index, onItemClick, onRecordInteraction }) => {
           <Globe size={10} /> {item.url}
         </div>
 
-        <p className="text-sm text-slate-400 leading-relaxed line-clamp-3 font-light">
-          {item.content || "No neural trace available for this node."}
-        </p>
+        <p className="text-sm text-slate-400 leading-relaxed line-clamp-3 font-light" 
+           dangerouslySetInnerHTML={{
+             __html: item.highlighted_snippet 
+               ? item.highlighted_snippet.replace(
+                   /\[\[HIGHLIGHT\]\](.*?)\[\[\/HIGHLIGHT\]\]/gi, 
+                   '<strong class="font-bold text-cyan-400 bg-cyan-500/20 px-1 rounded">$1</strong>'
+                 )
+               : (item.content || "No neural trace available for this node.")
+           }}
+        />
 
         <div className="mt-4 pt-4 border-t border-slate-700/50 flex justify-between items-center text-xs text-slate-500">
            <div className="flex gap-3">
@@ -357,25 +364,54 @@ const EducationalCards = () => (
 // ==========================================
 const KnowledgeInjectionPanel = ({ apiConfig, onNotification }) => {
   const [urlInput, setUrlInput] = useState('');
+  const [urlPassword, setUrlPassword] = useState('');
   const [textInput, setTextInput] = useState('');
   const [isUploading, setIsUploading] = useState(false);
 
   const handleUploadUrl = async () => {
-    if (!urlInput.trim()) return;
+    if (!urlInput.trim()) {
+      if (onNotification) {
+        onNotification("请输入URL", "error");
+      }
+      return;
+    }
+    
+    if (!urlPassword.trim()) {
+      if (onNotification) {
+        onNotification("请输入密码", "error");
+      }
+      return;
+    }
+    
     setIsUploading(true);
     try {
       const formData = new FormData();
       formData.append('url', urlInput);
-      await fetch(apiConfig.getURL(apiConfig.endpoints.upload.url), {
+      formData.append('password', urlPassword);
+      
+      const response = await fetch(apiConfig.getURL(apiConfig.endpoints.upload.url), {
         method: 'POST',
         body: formData
       });
-      setUrlInput('');
-      if (onNotification) {
-        onNotification("URL injected into the cortex. Processing...");
+      
+      const result = await response.json();
+      
+      if (response.ok) {
+        setUrlInput('');
+        setUrlPassword('');
+        if (onNotification) {
+          onNotification(result.message || "URL injected into the cortex. Processing...");
+        }
+      } else {
+        if (onNotification) {
+          onNotification(result.detail || "密码错误，爬取被拒绝", "error");
+        }
       }
     } catch (e) {
       console.error("Failed to upload URL", e);
+      if (onNotification) {
+        onNotification("上传失败: " + e.message, "error");
+      }
     } finally {
       setIsUploading(false);
     }
@@ -411,22 +447,32 @@ const KnowledgeInjectionPanel = ({ apiConfig, onNotification }) => {
             <span className="bg-cyan-500/20 text-cyan-400 text-xs font-medium mr-2 px-2.5 py-0.5 rounded border border-cyan-500/30">URL</span>
             Crawl & Absorb
           </h3>
-          <div className="flex gap-2">
+          <div className="space-y-2">
             <input
               type="text"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
               placeholder="https://tum.de/..."
-              className="flex-1 bg-slate-900 border border-slate-600 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2.5"
+              className="w-full bg-slate-900 border border-slate-600 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2.5"
               onKeyPress={(e) => e.key === 'Enter' && handleUploadUrl()}
             />
-            <button
-              onClick={handleUploadUrl}
-              disabled={isUploading}
-              className="text-white bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 font-medium rounded-lg text-sm px-5 py-2.5 transition-colors"
-            >
-              <Upload size={16} />
-            </button>
+            <div className="flex gap-2">
+              <input
+                type="password"
+                value={urlPassword}
+                onChange={(e) => setUrlPassword(e.target.value)}
+                placeholder="输入密码..."
+                className="flex-1 bg-slate-900 border border-slate-600 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2.5"
+                onKeyPress={(e) => e.key === 'Enter' && handleUploadUrl()}
+              />
+              <button
+                onClick={handleUploadUrl}
+                disabled={isUploading}
+                className="text-white bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 font-medium rounded-lg text-sm px-5 py-2.5 transition-colors"
+              >
+                <Upload size={16} />
+              </button>
+            </div>
           </div>
         </div>
         <div className="bg-slate-800/40 backdrop-blur-md p-6 rounded-xl border border-slate-700">

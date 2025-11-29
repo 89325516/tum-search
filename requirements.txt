@@ -15,3 +15,5 @@ maturin
 python-dotenv
 google-generativeai
 scipy
+mwxml
+mwparserfromhell

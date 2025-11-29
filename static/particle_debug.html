@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粒子效果调试页面</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #0f172a;
+            color: #fff;
+            font-family: monospace;
+        }
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: #0f172a;
+        }
+        .debug-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0,0,0,0.8);
+            padding: 20px;
+            border-radius: 8px;
+            z-index: 1000;
+            max-width: 400px;
+        }
+        .status {
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .success { background: rgba(0,255,0,0.2); }
+        .error { background: rgba(255,0,0,0.2); }
+        .warning { background: rgba(255,255,0,0.2); }
+        button {
+            margin: 5px;
+            padding: 8px 16px;
+            background: #3b82f6;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background: #2563eb; }
+    </style>
+</head>
+<body>
+    <canvas id="particle-canvas"></canvas>
+    
+    <div class="debug-panel">
+        <h3>🔍 粒子效果调试工具</h3>
+        <div id="status-log"></div>
+        <button onclick="testCanvas()">测试Canvas</button>
+        <button onclick="reloadParticles()">重新加载粒子</button>
+        <button onclick="checkErrors()">检查错误</button>
+    </div>
+
+    <script>
+        const statusLog = document.getElementById('status-log');
+        
+        function log(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            statusLog.appendChild(div);
+            console.log(`[Particle Debug] ${message}`);
+            // 只保留最后10条
+            while (statusLog.children.length > 10) {
+                statusLog.removeChild(statusLog.firstChild);
+            }
+        }
+        
+        function testCanvas() {
+            log('开始Canvas测试...', 'info');
+            const canvas = document.getElementById('particle-canvas');
+            if (!canvas) {
+                log('❌ Canvas元素不存在！', 'error');
+                return;
+            }
+            log('✅ Canvas元素存在', 'success');
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                log('❌ 无法获取2D上下文', 'error');
+                return;
+            }
+            log('✅ 2D上下文可用', 'success');
+            
+            log(`Canvas尺寸: ${canvas.width}x${canvas.height}`, 'info');
+            log(`Canvas显示样式: ${window.getComputedStyle(canvas).display}`, 'info');
+            log(`Canvas z-index: ${window.getComputedStyle(canvas).zIndex}`, 'info');
+            
+            // 测试绘制
+            ctx.fillStyle = 'rgba(255, 0, 0, 0.5)';
+            ctx.fillRect(100, 100, 50, 50);
+            log('✅ 测试绘制完成（应该看到红色方块）', 'success');
+            
+            setTimeout(() => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+            }, 2000);
+        }
+        
+        function checkErrors() {
+            log('检查常见错误...', 'info');
+            
+            // 检查Canvas
+            const canvas = document.getElementById('particle-canvas');
+            if (!canvas) {
+                log('❌ 错误：Canvas元素不存在', 'error');
+            } else {
+                log('✅ Canvas元素存在', 'success');
+            }
+            
+            // 检查尺寸
+            if (canvas) {
+                const rect = canvas.getBoundingClientRect();
+                if (rect.width === 0 || rect.height === 0) {
+                    log('⚠️ 警告：Canvas尺寸为0', 'warning');
+                } else {
+                    log(`✅ Canvas尺寸正常: ${rect.width}x${rect.height}`, 'success');
+                }
+            }
+            
+            // 检查JavaScript错误
+            window.onerror = function(msg, url, line) {
+                log(`❌ JavaScript错误: ${msg} (${url}:${line})`, 'error');
+                return false;
+            };
+            
+            log('✅ 错误检查完成', 'success');
+        }
+        
+        function reloadParticles() {
+            log('重新加载粒子效果...', 'info');
+            location.reload();
+        }
+        
+        // 自动运行诊断
+        window.addEventListener('load', function() {
+            log('页面加载完成，开始诊断...', 'info');
+            setTimeout(() => {
+                checkErrors();
+                testCanvas();
+            }, 1000);
+        });
+        
+        // 粒子效果代码（简化版，用于测试）
+        (function() {
+            const canvas = document.getElementById('particle-canvas');
+            if (!canvas) {
+                log('❌ Canvas未找到，无法初始化粒子', 'error');
+                return;
+            }
+            
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                log('❌ 无法获取Canvas上下文', 'error');
+                return;
+            }
+            
+            let width = window.innerWidth;
+            let height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+            
+            let particles = [];
+            const particleCount = 60;
+            
+            class Particle {
+                constructor() {
+                    this.x = Math.random() * width;
+                    this.y = Math.random() * height;
+                    this.vx = (Math.random() - 0.5) * 0.5;
+                    this.vy = (Math.random() - 0.5) * 0.5;
+                    this.size = Math.random() * 2 + 1;
+                    this.color = `rgba(${Math.random() * 50 + 100}, ${Math.random() * 100 + 155}, 255, ${Math.random() * 0.5 + 0.2})`;
+                }
+                
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    if (this.x < 0 || this.x > width) this.vx *= -1;
+                    if (this.y < 0 || this.y > height) this.vy *= -1;
+                }
+                
+                draw() {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                }
+            }
+            
+            for (let i = 0; i < particleCount; i++) {
+                particles.push(new Particle());
+            }
+            
+            function animate() {
+                ctx.clearRect(0, 0, width, height);
+                
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        let dx = particles[i].x - particles[j].x;
+                        let dy = particles[i].y - particles[j].y;
+                        let distance = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (distance < 150) {
+                            ctx.beginPath();
+                            ctx.strokeStyle = `rgba(100, 200, 255, ${1 - distance / 150})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+                
+                particles.forEach(p => {
+                    p.update();
+                    p.draw();
+                });
+                
+                requestAnimationFrame(animate);
+            }
+            
+            window.addEventListener('resize', () => {
+                width = window.innerWidth;
+                height = window.innerHeight;
+                canvas.width = width;
+                canvas.height = height;
+            });
+            
+            animate();
+            log('✅ 粒子效果已启动', 'success');
+        })();
+    </script>
+</body>
+</html>
