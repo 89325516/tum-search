@@ -61,11 +61,20 @@ class ConnectionManager:
         self.active_connections.remove(websocket)
 
     async def broadcast(self, message: dict):
+        """广播消息到所有活跃的WebSocket连接"""
+        if not self.active_connections:
+            print(f"⚠️ [Broadcast] No active WebSocket connections, message not sent: {message.get('type', 'unknown')}")
+            return
+        
+        success_count = 0
         for connection in self.active_connections:
             try:
                 await connection.send_json(message)
-            except:
-                pass
+                success_count += 1
+            except Exception as e:
+                print(f"⚠️ [Broadcast] Failed to send to one connection: {e}")
+        
+        print(f"✅ [Broadcast] Message sent to {success_count}/{len(self.active_connections)} connections: {message.get('type', 'unknown')}")
 
 
 ws_manager = ConnectionManager()
@@ -136,7 +145,22 @@ def background_process_content(task_type: str, content: str = None, file_path: s
             current_count = 0
             total_pages = max_pages  # 总数（使用max_pages作为估算）
             
-            # 立即发送开始消息（不延迟）
+            # 等待WebSocket连接建立（最多等待3秒）
+            import time
+            max_wait = 3.0
+            wait_interval = 0.1
+            waited = 0.0
+            while len(ws_manager.active_connections) == 0 and waited < max_wait:
+                time.sleep(wait_interval)
+                waited += wait_interval
+                print(f"⏳ [URL Task] Waiting for WebSocket connection... ({waited:.1f}s)")
+            
+            if len(ws_manager.active_connections) == 0:
+                print(f"⚠️ [URL Task] No WebSocket connections after {max_wait}s, proceeding anyway...")
+            else:
+                print(f"✅ [URL Task] WebSocket connection(s) ready: {len(ws_manager.active_connections)}")
+            
+            # 立即发送开始消息
             print(f"📢 [URL Task] About to send initial progress message...")
             broadcast_sync({
                 "type": "progress",
@@ -150,8 +174,7 @@ def background_process_content(task_type: str, content: str = None, file_path: s
             print("✅ [URL Task] Initial progress message sent")
             
             # 等待一小段时间，确保消息被发送
-            import time
-            time.sleep(0.1)
+            time.sleep(0.2)
             
             # Define callback to send progress via WebSocket
             def progress_callback(count, current_url):
@@ -232,21 +255,21 @@ def background_process_content(task_type: str, content: str = None, file_path: s
         )
 
         # 通过 WebSocket 广播给所有在线用户
-        asyncio.run(ws_manager.broadcast({
+        broadcast_sync({
             "type": "system_update",
             "message": notification_msg,
             "timestamp": timestamp
-        }))
+        })
         print("✅ [AsyncTask] Notification sent.")
 
     except Exception as e:
         print(f"❌ [AsyncTask] Error: {e}")
         import traceback
         traceback.print_exc()
-        asyncio.run(ws_manager.broadcast({
+        broadcast_sync({
             "type": "error",
             "message": f"Processing failed: {str(e)}"
-        }))
+        })
 
 
 def background_process_xml_dump(file_path: str, base_url: str = "", max_pages: int = None):
@@ -266,21 +289,21 @@ def background_process_xml_dump(file_path: str, base_url: str = "", max_pages: i
         # 进度回调函数
         def progress_callback(current: int, total: int, message: str):
             progress = int((current / total) * 100) if total > 0 else 0
-            asyncio.run(ws_manager.broadcast({
+            broadcast_sync({
                 "type": "progress",
                 "count": current,
                 "total": total,
                 "message": f"XML Dump处理进度: {current}/{total} ({progress}%) - {message}"
-            }))
+            })
         
         # 处理dump文件
         processor.process_dump(file_path, max_pages=max_pages, progress_callback=progress_callback)
         
         # 导入到数据库
-        asyncio.run(ws_manager.broadcast({
+        broadcast_sync({
             "type": "progress",
             "message": "正在导入数据到数据库..."
-        }))
+        })
         
         mgr_instance = SystemManager()
         stats = processor.import_to_database(
@@ -295,10 +318,10 @@ def background_process_xml_dump(file_path: str, base_url: str = "", max_pages: i
         # 导入边（链接关系）- 通过生成临时CSV然后导入
         edge_count = 0
         if processor.links:
-            asyncio.run(ws_manager.broadcast({
+            broadcast_sync({
                 "type": "progress",
                 "message": "正在导入链接关系..."
-            }))
+            })
             
             # 生成临时边CSV文件
             import tempfile
@@ -350,11 +373,11 @@ def background_process_xml_dump(file_path: str, base_url: str = "", max_pages: i
             f"处理时间: {duration:.2f}秒"
         )
         
-        asyncio.run(ws_manager.broadcast({
+        broadcast_sync({
             "type": "system_update",
             "message": success_msg,
             "timestamp": timestamp
-        }))
+        })
         
         print(f"✅ [XML Dump Import] Completed: {stats['success']} items, {edge_count} edges imported")
         
@@ -367,10 +390,10 @@ def background_process_xml_dump(file_path: str, base_url: str = "", max_pages: i
         if os.path.exists(file_path):
             os.remove(file_path)
         
-        asyncio.run(ws_manager.broadcast({
+        broadcast_sync({
             "type": "error",
             "message": f"XML Dump导入失败: {str(e)}"
-        }))
+        })
 
 
 # ================= 路由定义 =================
