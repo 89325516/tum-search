@@ -1,19 +1,19 @@
-// API配置
-// 配置后端API的基础URL
-// 如果前端和后端部署在同一域名下，可以设置为空字符串或相对路径
-// 如果前后端分离部署，需要设置为完整的后端URL，例如: 'https://api.example.com'
+// API Configuration
+// Configure the base URL for backend API
+// If frontend and backend are deployed under the same domain, can be set to empty string or relative path
+// If frontend and backend are deployed separately, need to set to full backend URL, e.g.: 'https://api.example.com'
 
 const API_CONFIG = {
-    // 后端API基础URL
-    baseURL: window.location.origin, // 默认使用当前域名
+    // Backend API base URL
+    baseURL: window.location.origin, // Default to current domain
     
-    // WebSocket连接URL
+    // WebSocket connection URL
     wsURL: (() => {
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
         return `${protocol}//${window.location.host}`;
     })(),
     
-    // API端点
+    // API endpoints
     endpoints: {
         search: '/api/search',
         feedback: '/api/feedback',
@@ -33,7 +33,7 @@ const API_CONFIG = {
         }
     },
     
-    // 获取完整的API URL
+    // Get full API URL
     getURL: function(endpoint) {
         if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) {
             return endpoint;
@@ -41,13 +41,13 @@ const API_CONFIG = {
         return `${this.baseURL}${endpoint}`;
     },
     
-    // 获取WebSocket URL
+    // Get WebSocket URL
     getWebSocketURL: function(path = '/ws') {
         return `${this.wsURL}${path}`;
     }
 };
 
-// 如果需要在不同环境使用不同配置，可以这样设置：
+// If you need to use different configurations for different environments, set it like this:
 // if (window.location.hostname === 'localhost') {
 //     API_CONFIG.baseURL = 'http://localhost:8000';
 //     API_CONFIG.wsURL = 'ws://localhost:8000';

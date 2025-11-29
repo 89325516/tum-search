@@ -4,14 +4,14 @@ import { Search, Zap, Shield, Activity, Share2, Globe, Cpu, ChevronRight, Shuffl
 // ==========================================
 // API CONFIGURATION (Import from config.js)
 // ==========================================
-// 注意：在实际项目中，应该从config.js导入
-// 这里为了兼容性，我们内联配置
-// 如果config.js被加载，window.API_CONFIG会被设置
+// Note: In actual projects, should import from config.js
+// Here we inline config for compatibility
+// If config.js is loaded, window.API_CONFIG will be set
 const getAPIConfig = () => {
   if (typeof window !== 'undefined' && window.API_CONFIG) {
     return window.API_CONFIG;
   }
-  // 默认配置（与config.js保持一致）
+  // Default configuration (consistent with config.js)
   const defaultConfig = {
     baseURL: typeof window !== 'undefined' ? window.location.origin : '',
     wsURL: (() => {
@@ -371,14 +371,14 @@ const KnowledgeInjectionPanel = ({ apiConfig, onNotification }) => {
   const handleUploadUrl = async () => {
     if (!urlInput.trim()) {
       if (onNotification) {
-        onNotification("请输入URL", "error");
+        onNotification("Please enter URL", "error");
       }
       return;
     }
     
     if (!urlPassword.trim()) {
       if (onNotification) {
-        onNotification("请输入密码", "error");
+        onNotification("Please enter password", "error");
       }
       return;
     }
@@ -404,13 +404,13 @@ const KnowledgeInjectionPanel = ({ apiConfig, onNotification }) => {
         }
       } else {
         if (onNotification) {
-          onNotification(result.detail || "密码错误，爬取被拒绝", "error");
+          onNotification(result.detail || "Incorrect password, crawl rejected", "error");
         }
       }
     } catch (e) {
       console.error("Failed to upload URL", e);
       if (onNotification) {
-        onNotification("上传失败: " + e.message, "error");
+        onNotification("Upload failed: " + e.message, "error");
       }
     } finally {
       setIsUploading(false);
@@ -461,7 +461,7 @@ const KnowledgeInjectionPanel = ({ apiConfig, onNotification }) => {
                 type="password"
                 value={urlPassword}
                 onChange={(e) => setUrlPassword(e.target.value)}
-                placeholder="输入密码..."
+                placeholder="Enter password..."
                 className="flex-1 bg-slate-900 border border-slate-600 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500 block p-2.5"
                 onKeyPress={(e) => e.key === 'Enter' && handleUploadUrl()}
               />
@@ -681,7 +681,7 @@ export default function App() {
   const [ws, setWs] = useState(null);
   const apiConfig = getAPIConfig();
 
-  // WebSocket连接
+  // WebSocket connection
   useEffect(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = apiConfig.getWebSocketURL();
@@ -705,7 +705,7 @@ export default function App() {
         setTimeout(() => {
           setProgressToast({ visible: false, count: 0, message: '' });
         }, 5000);
-        // 刷新feed和trending
+        // Refresh feed and trending
         window.location.reload();
       } else if (data.type === 'error') {
         setNotification({
@@ -726,7 +726,7 @@ export default function App() {
     };
   }, [apiConfig]);
 
-  // 记录用户交互
+  // Record user interaction
   const recordInteraction = async (itemId, url) => {
     try {
       const formData = new FormData();
@@ -743,12 +743,12 @@ export default function App() {
     }
   };
 
-  // 导航到详情页面
+  // Navigate to detail page
   const handleItemClick = (itemId) => {
     window.location.href = `/view/${itemId}`;
   };
 
-  // 显示通知
+  // Show notification
   const showNotification = (message) => {
     setNotification({ visible: true, message });
     setTimeout(() => {
@@ -756,7 +756,7 @@ export default function App() {
     }, 5000);
   };
 
-  // 搜索功能
+  // Search functionality
   const handleSearch = async (e) => {
     e?.preventDefault();
     if (!query.trim()) return;

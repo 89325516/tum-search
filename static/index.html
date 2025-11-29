@@ -26,7 +26,7 @@
             -webkit-text-fill-color: transparent;
         }
 
-        /* 粒子背景Canvas样式 */
+        /* Particle background Canvas styles */
         #particle-canvas {
             position: fixed !important;
             top: 0 !important;
@@ -42,7 +42,7 @@
 </head>
 
 <body class="bg-slate-900 text-slate-200 min-h-screen">
-    <!-- 粒子背景Canvas -->
+    <!-- Particle Background Canvas -->
     <canvas id="particle-canvas"></canvas>
 
     <!-- Navbar -->
@@ -238,23 +238,23 @@
                                 class="hidden">
                             <label for="csv-file-input"
                                 class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 cursor-pointer hover:bg-slate-700/70 transition-colors">
-                                <span id="csv-file-name" class="text-slate-400">选择CSV文件...</span>
+                                <span id="csv-file-name" class="text-slate-400">Select CSV file...</span>
                             </label>
                             <button onclick="document.getElementById('csv-file-input').click()"
-                                class="text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-4 py-2.5">选择文件</button>
+                                class="text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-4 py-2.5">Select File</button>
                         </div>
                         <div class="flex gap-2">
                             <input type="text" id="csv-url-prefix"
                                 class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
-                                placeholder="URL前缀 (可选，例如: https://wiki.example.com/page)">
+                                placeholder="URL prefix (optional, e.g.: https://wiki.example.com/page)">
                             <input type="password" id="csv-password"
                                 class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
-                                placeholder="输入密码...">
+                                placeholder="Enter password...">
                             <button onclick="uploadCSV()" id="csv-upload-btn"
-                                class="text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5">批量导入</button>
+                                class="text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5">Batch Import</button>
                         </div>
                         <div class="text-xs text-slate-400">
-                            💡 CSV格式：支持 title, content, url, category 等列。如果不包含URL，将自动生成。
+                            💡 CSV format: Supports columns like title, content, url, category. URLs will be auto-generated if not included.
                         </div>
                     </div>
                 </div>
@@ -270,26 +270,40 @@
                                 class="hidden">
                             <label for="xml-dump-file-input"
                                 class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 cursor-pointer hover:bg-slate-700/70 transition-colors">
-                                <span id="xml-dump-file-name" class="text-slate-400">选择XML Dump文件...</span>
+                                <span id="xml-dump-file-name" class="text-slate-400">Select XML Dump file...</span>
                             </label>
                             <button onclick="document.getElementById('xml-dump-file-input').click()"
-                                class="text-white bg-purple-600 hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-4 py-2.5">选择文件</button>
+                                class="text-white bg-purple-600 hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-4 py-2.5">Select File</button>
                         </div>
                         <div class="flex gap-2">
                             <input type="text" id="xml-dump-base-url"
                                 class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
-                                placeholder="Wiki基础URL (可选，例如: https://wiki.example.com)">
+                                placeholder="Wiki base URL (optional, e.g.: https://wiki.example.com)">
                             <input type="number" id="xml-dump-max-pages"
                                 class="w-32 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
-                                placeholder="最大页面数（可选，测试用）">
+                                placeholder="Max pages (optional, for testing)">
                             <input type="password" id="xml-dump-password"
                                 class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
-                                placeholder="输入密码...">
+                                placeholder="Enter password...">
                             <button onclick="uploadXMLDump()" id="xml-dump-upload-btn"
-                                class="text-white bg-purple-600 hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5">导入Dump</button>
+                                class="text-white bg-purple-600 hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5">Import Dump</button>
+                        </div>
+                        <!-- Upload Progress Bar (hidden by default) -->
+                        <div id="xml-dump-progress-container" class="hidden mt-3">
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs font-medium text-purple-400">Uploading...</span>
+                                <span id="xml-dump-progress-percent" class="text-xs font-mono text-purple-400">0%</span>
+                            </div>
+                            <div class="w-full bg-slate-700/50 rounded-full h-2 overflow-hidden">
+                                <div id="xml-dump-progress-bar" class="bg-gradient-to-r from-purple-600 to-purple-400 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                            </div>
+                            <div class="flex items-center justify-between mt-1">
+                                <span id="xml-dump-progress-size" class="text-xs text-slate-500">0 KB / 0 KB</span>
+                                <span id="xml-dump-progress-speed" class="text-xs text-slate-500">-- KB/s</span>
+                            </div>
                         </div>
                         <div class="text-xs text-slate-400">
-                            💡 支持MediaWiki/Wikipedia XML Dump文件（.xml, .xml.bz2, .xml.gz）。自动解析页面和链接关系，无需爬虫。
+                            💡 Supports MediaWiki/Wikipedia XML Dump files (.xml, .xml.bz2, .xml.gz). Automatically parses pages and link relationships, no crawler needed.
                         </div>
                     </div>
                 </div>
@@ -307,7 +321,7 @@
                         <div class="flex gap-2">
                             <input type="password" id="url-password"
                                 class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
-                                placeholder="输入密码..." 
+                                placeholder="Enter password..." 
                                 onkeypress="if(event.key === 'Enter') uploadUrl()">
                             <button onclick="uploadUrl()"
                                 class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5">Inject</button>
@@ -372,8 +386,8 @@
         // ==========================================
         // 3D PARTICLE NETWORK BACKGROUND
         // ==========================================
-        // 确保DOM加载完成后再初始化粒子效果
-        // 使用立即执行函数，如果DOM已加载则立即执行，否则等待DOMContentLoaded
+        // Ensure DOM is loaded before initializing particle effect
+        // Use IIFE, execute immediately if DOM is loaded, otherwise wait for DOMContentLoaded
         (function initParticleNetwork() {
             function startParticleNetwork() {
                 const canvas = document.getElementById('particle-canvas');
@@ -401,25 +415,25 @@
                     let animationRunning = false;
 
                     const resize = () => {
-                        // 获取窗口尺寸
+                        // Get window dimensions
                         width = window.innerWidth || document.documentElement.clientWidth || 1920;
                         height = window.innerHeight || document.documentElement.clientHeight || 1080;
                         
-                        // 确保尺寸有效（至少为1）
+                        // Ensure dimensions are valid (at least 1)
                         if (width <= 0) width = 1920;
                         if (height <= 0) height = 1080;
                         
-                        // 设置Canvas尺寸
+                        // Set Canvas dimensions
                         canvas.width = width;
                         canvas.height = height;
                         
                         console.log(`✅ Canvas resized to ${width}x${height}`);
                         
-                        // 只有在粒子为空时才初始化
+                        // Only initialize if particles are empty
                         if (particles.length === 0) {
                             initParticles();
                         } else {
-                            // 如果粒子已存在，重新定位它们以适应新尺寸
+                            // If particles exist, reposition them to fit new dimensions
                             particles.forEach(p => {
                                 p.x = Math.min(p.x, width);
                                 p.y = Math.min(p.y, height);
@@ -429,7 +443,7 @@
 
                     class Particle {
                         constructor() {
-                            // 使用当前实际的宽度和高度，如果未初始化则使用默认值
+                            // Use current actual width and height, or default values if not initialized
                             const w = width || window.innerWidth || 1920;
                             const h = height || window.innerHeight || 1080;
                             this.x = Math.random() * w;
@@ -459,7 +473,7 @@
                                 }
                             }
                             
-                            // 限制速度
+                            // Limit velocity
                             const maxSpeed = 2.0;
                             const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
                             if (speed > maxSpeed) {
@@ -494,7 +508,7 @@
                         try {
                             ctx.clearRect(0, 0, width, height);
                             
-                            // 绘制连接线
+                            // Draw connection lines
                             for (let i = 0; i < particles.length; i++) {
                                 for (let j = i + 1; j < particles.length; j++) {
                                     let dx = particles[i].x - particles[j].x;
@@ -512,7 +526,7 @@
                                 }
                             }
 
-                            // 更新和绘制粒子
+                            // Update and draw particles
                             particles.forEach(particle => {
                                 particle.update();
                                 particle.draw();
@@ -535,7 +549,7 @@
                         mouse.y = null;
                     };
 
-                    // 清理函数
+                    // Cleanup function
                     const cleanup = () => {
                         window.removeEventListener('resize', resize);
                         window.removeEventListener('mousemove', handleMouseMove);
@@ -545,15 +559,15 @@
                         }
                     };
 
-                    // 绑定事件
+                    // Bind events
                     window.addEventListener('resize', resize);
                     window.addEventListener('mousemove', handleMouseMove);
                     window.addEventListener('mouseleave', handleMouseLeave);
 
-                    // 初始化尺寸和粒子
+                    // Initialize dimensions and particles
                     resize();
                     
-                    // 验证初始化是否成功
+                    // Verify initialization success
                     if (particles.length === 0) {
                         console.error('Failed to initialize particles!');
                         return;
@@ -564,7 +578,7 @@
                         return;
                     }
                     
-                    // 启动动画循环
+                    // Start animation loop
                     animationRunning = true;
                     setTimeout(() => {
                         animate();
@@ -577,12 +591,12 @@
                 }
             }
 
-            // 防止重复初始化
+            // Prevent duplicate initialization
             let isInitialized = false;
             
-            // 多重检查确保Canvas元素存在后再执行
+            // Multiple checks to ensure Canvas element exists before execution
             function tryInitParticleNetwork() {
-                // 防止重复初始化
+                // Prevent duplicate initialization
                 if (isInitialized) {
                     console.log('Particle network already initialized, skipping...');
                     return;
@@ -590,12 +604,12 @@
                 
                 const canvas = document.getElementById('particle-canvas');
                 if (canvas) {
-                    // 标记为已初始化，避免重复
+                    // Mark as initialized to avoid duplicates
                     isInitialized = true;
                     canvas.dataset.initialized = 'true';
                     startParticleNetwork();
                 } else {
-                    // 如果Canvas还没准备好，等待一下再试（最多尝试10次）
+                    // If Canvas is not ready yet, wait and retry (max 10 attempts)
                     const maxRetries = 10;
                     let retryCount = 0;
                     
@@ -618,20 +632,20 @@
                 }
             }
             
-            // 根据DOM状态选择初始化时机
+            // Choose initialization timing based on DOM state
             if (document.readyState === 'loading') {
-                // DOM还在加载，等待DOMContentLoaded
+                // DOM is still loading, wait for DOMContentLoaded
                 document.addEventListener('DOMContentLoaded', function() {
                     console.log('DOMContentLoaded event fired, initializing particle network...');
                     setTimeout(tryInitParticleNetwork, 100);
                 });
             } else if (document.readyState === 'interactive' || document.readyState === 'complete') {
-                // DOM已加载或完全加载完成
+                // DOM is loaded or fully loaded
                 console.log(`DOM ready state: ${document.readyState}, initializing particle network...`);
                 setTimeout(tryInitParticleNetwork, 100);
             }
             
-            // 作为最终备用，监听window.onload
+            // As final fallback, listen to window.onload
             window.addEventListener('load', function() {
                 if (!isInitialized) {
                     console.log('Window load event fired, attempting particle network initialization...');
@@ -694,7 +708,7 @@
             const msgElement = document.getElementById('notification-msg');
             msgElement.textContent = msg;
             
-            // 根据类型设置不同的样式
+            // Set different styles based on type
             if (type === "error") {
                 toast.classList.remove('bg-green-500', 'bg-blue-500');
                 toast.classList.add('bg-red-500');
@@ -970,7 +984,7 @@
                     const snippet = item.content || "No preview available.";
                     const score = (item.score * 100).toFixed(1);
                     
-                    // HTML转义辅助函数（先定义，后使用）
+                    // HTML escape helper function (define before use)
                     const escapeHtml = (text) => {
                         if (!text) return '';
                         const div = document.createElement('div');
@@ -978,10 +992,10 @@
                         return div.innerHTML;
                     };
                     
-                    // 处理高亮摘要（如果有）
+                    // Process highlighted snippet (if available)
                     let highlightedSnippet = snippet;
                     if (item.highlighted_snippet) {
-                        // 先将高亮标记替换为临时占位符
+                        // First replace highlight markers with temporary placeholders
                         const placeholderStart = '___HIGHLIGHT_START___';
                         const placeholderEnd = '___HIGHLIGHT_END___';
                         let textWithPlaceholders = item.highlighted_snippet
@@ -990,13 +1004,13 @@
                         
                         let escapedText = escapeHtml(textWithPlaceholders);
                         
-                        // 将占位符替换为HTML标签
+                        // Replace placeholders with HTML tags
                         highlightedSnippet = escapedText
                             .replace(new RegExp(escapeHtml(placeholderStart), 'g'), 
                                     '<strong class="font-bold text-cyan-400 bg-cyan-500/20 px-1 rounded">')
                             .replace(new RegExp(escapeHtml(placeholderEnd), 'g'), '</strong>');
                     } else {
-                        // 如果没有高亮摘要，也要转义HTML
+                        // If no highlighted snippet, still escape HTML
                         highlightedSnippet = escapeHtml(snippet);
                     }
 
@@ -1011,7 +1025,7 @@
                         }
                     };
 
-                    // 创建卡片元素
+                    // Create card elements
                     const titleLink = document.createElement('a');
                     titleLink.href = `/view/${item.id}`;
                     titleLink.className = 'text-lg font-bold text-cyan-400 hover:text-cyan-300 transition-colors line-clamp-1';
@@ -1036,7 +1050,7 @@
                     
                     const snippetPara = document.createElement('p');
                     snippetPara.className = 'text-slate-300 text-sm leading-relaxed line-clamp-3';
-                    snippetPara.innerHTML = highlightedSnippet; // 直接使用innerHTML支持HTML高亮
+                    snippetPara.innerHTML = highlightedSnippet; // Directly use innerHTML to support HTML highlighting
                     
                     const footerDiv = document.createElement('div');
                     footerDiv.className = 'mt-4 pt-4 border-t border-slate-700/50 flex justify-between items-center';
@@ -1071,12 +1085,12 @@
             const password = document.getElementById('url-password').value;
             
             if (!url) {
-                showNotification("请输入URL", "error");
+                showNotification("Please enter URL", "error");
                 return;
             }
             
             if (!password) {
-                showNotification("请输入密码", "error");
+                showNotification("Please enter password", "error");
                 document.getElementById('url-password').focus();
                 return;
             }
@@ -1098,11 +1112,11 @@
                     document.getElementById('url-password').value = '';
                     showNotification(result.message || "URL injected into the cortex. Processing...");
                 } else {
-                    showNotification(result.detail || "密码错误，爬取被拒绝", "error");
+                    showNotification(result.detail || "Incorrect password, crawl rejected", "error");
                 }
             } catch (error) {
                 console.error("Failed to upload URL", error);
-                showNotification("上传失败: " + error.message, "error");
+                showNotification("Upload failed: " + error.message, "error");
             }
         }
 
@@ -1116,7 +1130,7 @@
             showNotification("Text fragment absorbed. Processing...");
         }
 
-        // CSV文件选择和上传
+        // CSV file selection and upload
         document.getElementById('csv-file-input').addEventListener('change', function(e) {
             const file = e.target.files[0];
             if (file) {
@@ -1131,12 +1145,12 @@
             const uploadBtn = document.getElementById('csv-upload-btn');
             
             if (!fileInput.files || !fileInput.files[0]) {
-                showNotification("请选择CSV文件", "error");
+                showNotification("Please select a CSV file", "error");
                 return;
             }
             
             if (!password) {
-                showNotification("请输入密码", "error");
+                showNotification("Please enter password", "error");
                 document.getElementById('csv-password').focus();
                 return;
             }
@@ -1144,13 +1158,13 @@
             const file = fileInput.files[0];
             
             if (!file.name.endsWith('.csv')) {
-                showNotification("只支持CSV文件格式", "error");
+                showNotification("Only CSV file format is supported", "error");
                 return;
             }
             
             try {
                 uploadBtn.disabled = true;
-                uploadBtn.textContent = '上传中...';
+                uploadBtn.textContent = 'Uploading...';
                 
                 const formData = new FormData();
                 formData.append('file', file);
@@ -1167,94 +1181,181 @@
                 const result = await response.json();
                 
                 if (response.ok) {
-                    showNotification(result.message || "CSV文件已接收，正在批量导入...");
-                    // 清空表单
+                    showNotification(result.message || "CSV file received, starting batch import...");
+                    // Clear form
                     fileInput.value = '';
-                    document.getElementById('csv-file-name').textContent = '选择CSV文件...';
+                    document.getElementById('csv-file-name').textContent = 'Select CSV file...';
                     document.getElementById('csv-password').value = '';
                     document.getElementById('csv-url-prefix').value = '';
                 } else {
-                    showNotification(result.detail || "CSV导入失败", "error");
+                    showNotification(result.detail || "CSV import failed", "error");
                 }
             } catch (error) {
                 console.error("Failed to upload CSV", error);
-                showNotification("上传失败: " + error.message, "error");
+                showNotification("Upload failed: " + error.message, "error");
             } finally {
                 uploadBtn.disabled = false;
-                uploadBtn.textContent = '批量导入';
+                uploadBtn.textContent = 'Batch Import';
             }
         }
 
-        async function uploadXMLDump() {
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function uploadXMLDump() {
             const fileInput = document.getElementById('xml-dump-file-input');
             const password = document.getElementById('xml-dump-password').value;
             const baseUrl = document.getElementById('xml-dump-base-url').value;
             const maxPages = document.getElementById('xml-dump-max-pages').value;
             const uploadBtn = document.getElementById('xml-dump-upload-btn');
+            const progressContainer = document.getElementById('xml-dump-progress-container');
+            const progressBar = document.getElementById('xml-dump-progress-bar');
+            const progressPercent = document.getElementById('xml-dump-progress-percent');
+            const progressSize = document.getElementById('xml-dump-progress-size');
+            const progressSpeed = document.getElementById('xml-dump-progress-speed');
             
             if (!fileInput.files || !fileInput.files[0]) {
-                showNotification("请选择XML Dump文件", "error");
+                showNotification("Please select an XML Dump file", "error");
                 return;
             }
             
             if (!password) {
-                showNotification("请输入密码", "error");
+                showNotification("Please enter password", "error");
                 document.getElementById('xml-dump-password').focus();
                 return;
             }
             
             const file = fileInput.files[0];
             
-            // 检查文件扩展名
+            // Check file extension
             const validExtensions = ['.xml', '.bz2', '.gz'];
             const fileName = file.name.toLowerCase();
             const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext)) || 
                                      fileName.endsWith('.xml.bz2') || fileName.endsWith('.xml.gz');
             
             if (!hasValidExtension) {
-                showNotification("只支持XML格式的dump文件（.xml, .xml.bz2, .xml.gz）", "error");
+                showNotification("Only XML dump file formats are supported (.xml, .xml.bz2, .xml.gz)", "error");
                 return;
             }
             
-            try {
-                uploadBtn.disabled = true;
-                uploadBtn.textContent = '上传中...';
-                
-                const formData = new FormData();
-                formData.append('file', file);
-                formData.append('password', password);
-                if (baseUrl) {
-                    formData.append('base_url', baseUrl);
-                }
-                if (maxPages) {
-                    formData.append('max_pages', maxPages);
-                }
-                
-                const response = await fetch('/api/upload/xml-dump', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    showNotification(result.message || "XML Dump文件已接收，正在解析和导入...");
-                    // 清空表单
-                    fileInput.value = '';
-                    document.getElementById('xml-dump-file-name').textContent = '选择XML Dump文件...';
-                    document.getElementById('xml-dump-password').value = '';
-                    document.getElementById('xml-dump-base-url').value = '';
-                    document.getElementById('xml-dump-max-pages').value = '';
-                } else {
-                    showNotification(result.detail || "XML Dump导入失败", "error");
-                }
-            } catch (error) {
-                console.error("Failed to upload XML Dump", error);
-                showNotification("上传失败: " + error.message, "error");
-            } finally {
-                uploadBtn.disabled = false;
-                uploadBtn.textContent = '导入Dump';
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('password', password);
+            if (baseUrl) {
+                formData.append('base_url', baseUrl);
             }
+            if (maxPages) {
+                formData.append('max_pages', maxPages);
+            }
+            
+            // Setup progress tracking
+            const totalSize = file.size;
+            let uploadedSize = 0;
+            let startTime = Date.now();
+            let lastUploaded = 0;
+            let lastTime = startTime;
+            
+            // Show progress bar
+            progressContainer.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressPercent.textContent = '0%';
+            progressSize.textContent = `0 KB / ${formatBytes(totalSize)}`;
+            progressSpeed.textContent = '-- KB/s';
+            
+            // Disable upload button
+            uploadBtn.disabled = true;
+            uploadBtn.textContent = 'Uploading...';
+            
+            // Use XMLHttpRequest for upload progress support
+            const xhr = new XMLHttpRequest();
+            
+            // Upload progress event
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    uploadedSize = e.loaded;
+                    const percent = Math.round((e.loaded / e.total) * 100);
+                    
+                    // Update progress bar
+                    progressBar.style.width = percent + '%';
+                    progressPercent.textContent = percent + '%';
+                    progressSize.textContent = `${formatBytes(e.loaded)} / ${formatBytes(e.total)}`;
+                    
+                    // Calculate upload speed
+                    const currentTime = Date.now();
+                    const timeDelta = (currentTime - lastTime) / 1000; // seconds
+                    if (timeDelta >= 0.5) { // Update speed every 500ms
+                        const bytesDelta = e.loaded - lastUploaded;
+                        const speed = bytesDelta / timeDelta; // bytes per second
+                        progressSpeed.textContent = formatBytes(speed) + '/s';
+                        
+                        lastUploaded = e.loaded;
+                        lastTime = currentTime;
+                    }
+                }
+            });
+            
+            // Load event (upload complete)
+            xhr.addEventListener('load', () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const result = JSON.parse(xhr.responseText);
+                        showNotification(result.message || "XML Dump file received, parsing and importing...");
+                        
+                        // Hide progress bar after a short delay
+                        setTimeout(() => {
+                            progressContainer.classList.add('hidden');
+                        }, 1000);
+                        
+                        // Clear form
+                        fileInput.value = '';
+                        document.getElementById('xml-dump-file-name').textContent = 'Select XML Dump file...';
+                        document.getElementById('xml-dump-password').value = '';
+                        document.getElementById('xml-dump-base-url').value = '';
+                        document.getElementById('xml-dump-max-pages').value = '';
+                    } catch (e) {
+                        console.error("Failed to parse response", e);
+                        showNotification("Upload completed but failed to parse response", "error");
+                        progressContainer.classList.add('hidden');
+                    }
+                } else {
+                    try {
+                        const result = JSON.parse(xhr.responseText);
+                        showNotification(result.detail || "XML Dump import failed", "error");
+                    } catch (e) {
+                        showNotification("Upload failed with status " + xhr.status, "error");
+                    }
+                    progressContainer.classList.add('hidden');
+                }
+                
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Import Dump';
+            });
+            
+            // Error event
+            xhr.addEventListener('error', () => {
+                showNotification("Upload failed: Network error", "error");
+                progressContainer.classList.add('hidden');
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Import Dump';
+            });
+            
+            // Abort event
+            xhr.addEventListener('abort', () => {
+                showNotification("Upload cancelled", "error");
+                progressContainer.classList.add('hidden');
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = 'Import Dump';
+            });
+            
+            // Send request
+            xhr.open('POST', '/api/upload/xml-dump');
+            xhr.send(formData);
         }
 
         // Enter key to search
@@ -1264,13 +1365,13 @@
 
         // CSV file input change handler
         document.getElementById('csv-file-input').addEventListener('change', function(e) {
-            const fileName = e.target.files[0] ? e.target.files[0].name : '选择CSV文件...';
+            const fileName = e.target.files[0] ? e.target.files[0].name : 'Select CSV file...';
             document.getElementById('csv-file-name').textContent = fileName;
         });
 
         // XML Dump file input change handler
         document.getElementById('xml-dump-file-input').addEventListener('change', function(e) {
-            const fileName = e.target.files[0] ? e.target.files[0].name : '选择XML Dump文件...';
+            const fileName = e.target.files[0] ? e.target.files[0].name : 'Select XML Dump file...';
             document.getElementById('xml-dump-file-name').textContent = fileName;
         });
 
