@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TUM Neural Knowledge Network</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         body {
@@ -27,13 +28,15 @@
 
         /* 粒子背景Canvas样式 */
         #particle-canvas {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -10;
-            background: #0f172a;
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            z-index: -10 !important;
+            background: #0f172a !important;
+            display: block !important;
+            pointer-events: none;
         }
     </style>
 </head>
@@ -186,15 +189,75 @@
             </div>
         </div>
 
-        <!-- Results Section -->
-        <div id="results-area" class="max-w-4xl mx-auto space-y-6">
-            <!-- Results will be injected here -->
+        <!-- Results Section with Tabs -->
+        <div id="results-section" class="max-w-7xl mx-auto hidden">
+            <!-- Tab Navigation -->
+            <div class="flex items-center justify-center mb-6 gap-2">
+                <button id="tab-list" onclick="switchTab('list')" 
+                    class="px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 bg-cyan-500/20 text-cyan-400 border-2 border-cyan-500/50 hover:bg-cyan-500/30 active-tab">
+                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                    </svg>
+                    List View
+                </button>
+                <button id="tab-graph" onclick="switchTab('graph')" 
+                    class="px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 bg-slate-800/50 text-slate-400 border-2 border-slate-700/50 hover:bg-slate-700/50 hover:text-cyan-400 hover:border-cyan-500/50">
+                    <svg class="w-5 h-5 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+                    </svg>
+                    Graph View
+                </button>
+            </div>
+
+            <!-- List View -->
+            <div id="list-view" class="space-y-6">
+                <div id="results-area" class="max-w-4xl mx-auto space-y-6">
+                    <!-- Results will be injected here -->
+                </div>
+            </div>
+
+            <!-- Graph View -->
+            <div id="graph-view" class="hidden">
+                <div id="graph-container" style="width: 100%; height: 700px; background: rgba(15, 23, 42, 0.5); border-radius: 12px; border: 1px solid rgba(148, 163, 184, 0.2);"></div>
+            </div>
         </div>
 
         <!-- Injection Panel (Upload) -->
         <div class="mt-24 border-t border-slate-700/50 pt-12">
             <h2 class="text-2xl font-bold text-slate-100 mb-6 text-center">Inject Knowledge</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+                <!-- CSV Import -->
+                <div class="bg-slate-800/50 backdrop-blur-sm p-6 rounded-xl border border-slate-700/50 md:col-span-2">
+                    <h3 class="font-semibold mb-4 flex items-center text-slate-100">
+                        <span class="bg-green-100 text-green-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded">CSV</span>
+                        Batch Import (Wiki Style)
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex gap-2 items-center">
+                            <input type="file" id="csv-file-input" accept=".csv"
+                                class="hidden">
+                            <label for="csv-file-input"
+                                class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 cursor-pointer hover:bg-slate-700/70 transition-colors">
+                                <span id="csv-file-name" class="text-slate-400">选择CSV文件...</span>
+                            </label>
+                            <button onclick="document.getElementById('csv-file-input').click()"
+                                class="text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-4 py-2.5">选择文件</button>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="csv-url-prefix"
+                                class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
+                                placeholder="URL前缀 (可选，例如: https://wiki.example.com/page)">
+                            <input type="password" id="csv-password"
+                                class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
+                                placeholder="输入密码...">
+                            <button onclick="uploadCSV()" id="csv-upload-btn"
+                                class="text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5">批量导入</button>
+                        </div>
+                        <div class="text-xs text-slate-400">
+                            💡 CSV格式：支持 title, content, url, category 等列。如果不包含URL，将自动生成。
+                        </div>
+                    </div>
+                </div>
                 <!-- URL Injection -->
                 <div class="bg-slate-800/50 backdrop-blur-sm p-6 rounded-xl border border-slate-700/50">
                     <h3 class="font-semibold mb-4 flex items-center">
@@ -202,12 +265,18 @@
                             class="bg-blue-100 text-blue-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded">URL</span>
                         Crawl & Absorb
                     </h3>
-                    <div class="flex gap-2">
+                    <div class="space-y-2">
                         <input type="text" id="url-input"
-                            class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
+                            class="w-full bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
                             placeholder="https://tum.de/...">
-                        <button onclick="uploadUrl()"
-                            class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5">Inject</button>
+                        <div class="flex gap-2">
+                            <input type="password" id="url-password"
+                                class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
+                                placeholder="输入密码..." 
+                                onkeypress="if(event.key === 'Enter') uploadUrl()">
+                            <button onclick="uploadUrl()"
+                                class="text-white bg-blue-600 hover:bg-blue-700 focus:ring-4 focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5">Inject</button>
+                        </div>
                     </div>
                 </div>
                 <!-- Text Injection -->
@@ -285,27 +354,51 @@
                         return;
                     }
                     
-                    let animationFrameId;
-                    let width, height;
+                    let animationFrameId = null;
+                    let width = 0;
+                    let height = 0;
                     let particles = [];
 
                     const particleCount = 60;
                     const connectionDistance = 150;
                     const mouseDistance = 200;
                     let mouse = { x: null, y: null };
+                    let animationRunning = false;
 
                     const resize = () => {
-                        width = window.innerWidth;
-                        height = window.innerHeight;
+                        // 获取窗口尺寸
+                        width = window.innerWidth || document.documentElement.clientWidth || 1920;
+                        height = window.innerHeight || document.documentElement.clientHeight || 1080;
+                        
+                        // 确保尺寸有效（至少为1）
+                        if (width <= 0) width = 1920;
+                        if (height <= 0) height = 1080;
+                        
+                        // 设置Canvas尺寸
                         canvas.width = width;
                         canvas.height = height;
-                        initParticles();
+                        
+                        console.log(`✅ Canvas resized to ${width}x${height}`);
+                        
+                        // 只有在粒子为空时才初始化
+                        if (particles.length === 0) {
+                            initParticles();
+                        } else {
+                            // 如果粒子已存在，重新定位它们以适应新尺寸
+                            particles.forEach(p => {
+                                p.x = Math.min(p.x, width);
+                                p.y = Math.min(p.y, height);
+                            });
+                        }
                     };
 
                     class Particle {
                         constructor() {
-                            this.x = Math.random() * width;
-                            this.y = Math.random() * height;
+                            // 使用当前实际的宽度和高度，如果未初始化则使用默认值
+                            const w = width || window.innerWidth || 1920;
+                            const h = height || window.innerHeight || 1080;
+                            this.x = Math.random() * w;
+                            this.y = Math.random() * h;
                             this.vx = (Math.random() - 0.5) * 0.5;
                             this.vy = (Math.random() - 0.5) * 0.5;
                             this.size = Math.random() * 2 + 1;
@@ -356,35 +449,45 @@
                     };
 
                     const animate = () => {
-                        if (!ctx) return;
+                        if (!ctx || !animationRunning) return;
+                        if (width <= 0 || height <= 0 || particles.length === 0) {
+                            console.warn('Animation skipped: invalid dimensions or no particles');
+                            animationFrameId = requestAnimationFrame(animate);
+                            return;
+                        }
                         
-                        ctx.clearRect(0, 0, width, height);
-                        
-                        // 绘制连接线
-                        for (let i = 0; i < particles.length; i++) {
-                            for (let j = i + 1; j < particles.length; j++) {
-                                let dx = particles[i].x - particles[j].x;
-                                let dy = particles[i].y - particles[j].y;
-                                let distance = Math.sqrt(dx * dx + dy * dy);
+                        try {
+                            ctx.clearRect(0, 0, width, height);
+                            
+                            // 绘制连接线
+                            for (let i = 0; i < particles.length; i++) {
+                                for (let j = i + 1; j < particles.length; j++) {
+                                    let dx = particles[i].x - particles[j].x;
+                                    let dy = particles[i].y - particles[j].y;
+                                    let distance = Math.sqrt(dx * dx + dy * dy);
 
-                                if (distance < connectionDistance) {
-                                    ctx.beginPath();
-                                    ctx.strokeStyle = `rgba(100, 200, 255, ${1 - distance / connectionDistance})`;
-                                    ctx.lineWidth = 0.5;
-                                    ctx.moveTo(particles[i].x, particles[i].y);
-                                    ctx.lineTo(particles[j].x, particles[j].y);
-                                    ctx.stroke();
+                                    if (distance < connectionDistance && distance > 0) {
+                                        ctx.beginPath();
+                                        ctx.strokeStyle = `rgba(100, 200, 255, ${1 - distance / connectionDistance})`;
+                                        ctx.lineWidth = 0.5;
+                                        ctx.moveTo(particles[i].x, particles[i].y);
+                                        ctx.lineTo(particles[j].x, particles[j].y);
+                                        ctx.stroke();
+                                    }
                                 }
                             }
+
+                            // 更新和绘制粒子
+                            particles.forEach(particle => {
+                                particle.update();
+                                particle.draw();
+                            });
+
+                            animationFrameId = requestAnimationFrame(animate);
+                        } catch (error) {
+                            console.error('Error in animation loop:', error);
+                            animationRunning = false;
                         }
-
-                        // 更新和绘制粒子
-                        particles.forEach(particle => {
-                            particle.update();
-                            particle.draw();
-                        });
-
-                        animationFrameId = requestAnimationFrame(animate);
                     };
 
                     const handleMouseMove = (e) => {
@@ -412,23 +515,94 @@
                     window.addEventListener('mousemove', handleMouseMove);
                     window.addEventListener('mouseleave', handleMouseLeave);
 
-                    // 启动动画
+                    // 初始化尺寸和粒子
                     resize();
-                    animate();
                     
-                    console.log('Particle network initialized successfully');
+                    // 验证初始化是否成功
+                    if (particles.length === 0) {
+                        console.error('Failed to initialize particles!');
+                        return;
+                    }
+                    
+                    if (width <= 0 || height <= 0) {
+                        console.error(`Invalid canvas dimensions: ${width}x${height}`);
+                        return;
+                    }
+                    
+                    // 启动动画循环
+                    animationRunning = true;
+                    setTimeout(() => {
+                        animate();
+                        console.log('✅ Particle network initialized successfully');
+                        console.log(`   Canvas: ${canvas.width}x${canvas.height}`);
+                        console.log(`   Particles: ${particles.length}`);
+                    }, 150);
                 } catch (error) {
                     console.error('Error initializing particle network:', error);
                 }
             }
 
-            // 如果DOM已加载，立即执行；否则等待DOMContentLoaded
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', startParticleNetwork);
-            } else {
-                // DOM已经加载完成
-                startParticleNetwork();
+            // 防止重复初始化
+            let isInitialized = false;
+            
+            // 多重检查确保Canvas元素存在后再执行
+            function tryInitParticleNetwork() {
+                // 防止重复初始化
+                if (isInitialized) {
+                    console.log('Particle network already initialized, skipping...');
+                    return;
+                }
+                
+                const canvas = document.getElementById('particle-canvas');
+                if (canvas) {
+                    // 标记为已初始化，避免重复
+                    isInitialized = true;
+                    canvas.dataset.initialized = 'true';
+                    startParticleNetwork();
+                } else {
+                    // 如果Canvas还没准备好，等待一下再试（最多尝试10次）
+                    const maxRetries = 10;
+                    let retryCount = 0;
+                    
+                    function retry() {
+                        retryCount++;
+                        const canvas = document.getElementById('particle-canvas');
+                        if (canvas) {
+                            isInitialized = true;
+                            canvas.dataset.initialized = 'true';
+                            startParticleNetwork();
+                        } else if (retryCount < maxRetries) {
+                            console.warn(`Canvas not found, retrying... (${retryCount}/${maxRetries})`);
+                            setTimeout(retry, 200);
+                        } else {
+                            console.error('Failed to find Canvas element after multiple attempts!');
+                        }
+                    }
+                    
+                    setTimeout(retry, 100);
+                }
             }
+            
+            // 根据DOM状态选择初始化时机
+            if (document.readyState === 'loading') {
+                // DOM还在加载，等待DOMContentLoaded
+                document.addEventListener('DOMContentLoaded', function() {
+                    console.log('DOMContentLoaded event fired, initializing particle network...');
+                    setTimeout(tryInitParticleNetwork, 100);
+                });
+            } else if (document.readyState === 'interactive' || document.readyState === 'complete') {
+                // DOM已加载或完全加载完成
+                console.log(`DOM ready state: ${document.readyState}, initializing particle network...`);
+                setTimeout(tryInitParticleNetwork, 100);
+            }
+            
+            // 作为最终备用，监听window.onload
+            window.addEventListener('load', function() {
+                if (!isInitialized) {
+                    console.log('Window load event fired, attempting particle network initialization...');
+                    setTimeout(tryInitParticleNetwork, 200);
+                }
+            });
         })();
 
         // ==========================================
@@ -480,9 +654,20 @@
             }
         };
 
-        function showNotification(msg) {
+        function showNotification(msg, type = "success") {
             const toast = document.getElementById('notification-toast');
-            document.getElementById('notification-msg').textContent = msg;
+            const msgElement = document.getElementById('notification-msg');
+            msgElement.textContent = msg;
+            
+            // 根据类型设置不同的样式
+            if (type === "error") {
+                toast.classList.remove('bg-green-500', 'bg-blue-500');
+                toast.classList.add('bg-red-500');
+            } else {
+                toast.classList.remove('bg-red-500');
+                toast.classList.add('bg-green-500');
+            }
+            
             toast.classList.remove('translate-y-24');
             setTimeout(hideNotification, 5000);
         }
@@ -537,15 +722,200 @@
             }
         }
 
+        let currentView = 'list';
+        let currentSearchResults = null;
+        let graphChart = null;
+
+        function switchTab(view) {
+            currentView = view;
+            const listTab = document.getElementById('tab-list');
+            const graphTab = document.getElementById('tab-graph');
+            const listView = document.getElementById('list-view');
+            const graphView = document.getElementById('graph-view');
+
+            if (view === 'list') {
+                listTab.className = 'px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 bg-cyan-500/20 text-cyan-400 border-2 border-cyan-500/50 hover:bg-cyan-500/30 active-tab';
+                graphTab.className = 'px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 bg-slate-800/50 text-slate-400 border-2 border-slate-700/50 hover:bg-slate-700/50 hover:text-cyan-400 hover:border-cyan-500/50';
+                listView.classList.remove('hidden');
+                graphView.classList.add('hidden');
+            } else {
+                listTab.className = 'px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 bg-slate-800/50 text-slate-400 border-2 border-slate-700/50 hover:bg-slate-700/50 hover:text-cyan-400 hover:border-cyan-500/50';
+                graphTab.className = 'px-6 py-3 text-sm font-semibold rounded-lg transition-all duration-200 bg-cyan-500/20 text-cyan-400 border-2 border-cyan-500/50 hover:bg-cyan-500/30 active-tab';
+                listView.classList.add('hidden');
+                graphView.classList.remove('hidden');
+                
+                // Render graph if we have search results
+                if (currentSearchResults) {
+                    renderGraphView(currentSearchResults);
+                }
+            }
+        }
+
+        async function renderGraphView(query) {
+            const graphContainer = document.getElementById('graph-container');
+            
+            // Show loading
+            graphContainer.innerHTML = '<div class="flex items-center justify-center h-full"><div class="text-center"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600 mx-auto"></div><p class="mt-4 text-slate-400">Building neural network graph...</p></div></div>';
+
+            try {
+                const response = await fetch(`/api/search/graph?q=${encodeURIComponent(query)}`);
+                const graphData = await response.json();
+
+                if (!graphData.nodes || graphData.nodes.length === 0) {
+                    graphContainer.innerHTML = '<div class="flex items-center justify-center h-full text-slate-400">No connections found. Try a different search.</div>';
+                    return;
+                }
+
+                // Initialize ECharts
+                if (graphChart) {
+                    graphChart.dispose();
+                }
+                graphChart = echarts.init(graphContainer);
+
+                // Prepare nodes and edges for ECharts
+                const nodes = graphData.nodes.map((node, idx) => ({
+                    id: node.id,
+                    name: node.name,
+                    value: node.value || 30,
+                    category: node.isCenter ? 0 : 1, // 0 = center, 1 = related
+                    symbolSize: node.isCenter ? Math.max(40, node.value || 40) : Math.max(20, (node.value || 20) * 0.8),
+                    itemStyle: {
+                        color: node.isCenter ? '#06b6d4' : '#8b5cf6', // cyan for center, purple for related
+                        borderColor: node.isCenter ? '#0891b2' : '#7c3aed',
+                        borderWidth: 2,
+                        shadowBlur: 10,
+                        shadowColor: node.isCenter ? 'rgba(6, 182, 212, 0.5)' : 'rgba(139, 92, 246, 0.5)'
+                    },
+                    label: {
+                        show: true,
+                        fontSize: 12,
+                        fontWeight: node.isCenter ? 'bold' : 'normal',
+                        color: node.isCenter ? '#06b6d4' : '#cbd5e1',
+                        formatter: (params) => {
+                            const name = params.data.name || 'Node';
+                            return name.length > 20 ? name.substring(0, 17) + '...' : name;
+                        }
+                    },
+                    url: node.url,
+                    content: node.content
+                }));
+
+                const edges = graphData.edges.map(edge => ({
+                    source: edge.source,
+                    target: edge.target,
+                    value: edge.value || 1,
+                    lineStyle: {
+                        color: '#475569',
+                        width: Math.max(1, edge.value * 2),
+                        curveness: 0.3,
+                        opacity: 0.6
+                    },
+                    label: {
+                        show: false
+                    }
+                }));
+
+                const option = {
+                    backgroundColor: 'transparent',
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: (params) => {
+                            if (params.dataType === 'node') {
+                                return `
+                                    <div style="padding: 8px;">
+                                        <div style="font-weight: bold; color: #06b6d4; margin-bottom: 4px;">${params.data.name}</div>
+                                        ${params.data.url ? `<div style="font-size: 11px; color: #94a3b8; margin-bottom: 4px;">${params.data.url}</div>` : ''}
+                                        ${params.data.content ? `<div style="font-size: 11px; color: #cbd5e1; max-width: 300px;">${params.data.content}</div>` : ''}
+                                    </div>
+                                `;
+                            }
+                            return '';
+                        },
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        borderColor: '#06b6d4',
+                        borderWidth: 1,
+                        textStyle: {
+                            color: '#e2e8f0'
+                        }
+                    },
+                    series: [{
+                        type: 'graph',
+                        layout: 'force',
+                        data: nodes,
+                        links: edges,
+                        categories: [
+                            { name: 'Center', itemStyle: { color: '#06b6d4' } },
+                            { name: 'Related', itemStyle: { color: '#8b5cf6' } }
+                        ],
+                        roam: true,
+                        label: {
+                            show: true,
+                            position: 'right',
+                            formatter: '{b}'
+                        },
+                        labelLayout: {
+                            hideOverlap: true
+                        },
+                        emphasis: {
+                            focus: 'adjacency',
+                            lineStyle: {
+                                width: 4
+                            }
+                        },
+                        force: {
+                            repulsion: 200,
+                            gravity: 0.1,
+                            edgeLength: 150,
+                            layoutAnimation: true
+                        },
+                        lineStyle: {
+                            opacity: 0.6,
+                            curveness: 0.3
+                        }
+                    }]
+                };
+
+                graphChart.setOption(option);
+
+                // Handle node click
+                graphChart.on('click', (params) => {
+                    if (params.dataType === 'node' && params.data.url) {
+                        recordInteraction(params.data.id, params.data.url);
+                        window.location.href = `/view/${params.data.id}`;
+                    }
+                });
+
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    if (graphChart) {
+                        graphChart.resize();
+                    }
+                });
+
+            } catch (e) {
+                console.error('Graph render error:', e);
+                graphContainer.innerHTML = `<div class="flex items-center justify-center h-full text-red-400">Error rendering graph: ${e.message}</div>`;
+            }
+        }
+
         async function performSearch() {
             const query = document.getElementById('search-input').value;
             if (!query) return;
 
+            const resultsSection = document.getElementById('results-section');
             const resultsDiv = document.getElementById('results-area');
             const introCards = document.getElementById('intro-cards');
 
-            // Hide intro cards
+            // Hide intro cards and show results section
             if (introCards) introCards.style.display = 'none';
+            if (resultsSection) {
+                resultsSection.classList.remove('hidden');
+                // Reset to list view
+                switchTab('list');
+            }
+
+            // Store query for graph view
+            currentSearchResults = query;
 
             resultsDiv.innerHTML = '<div class="text-center py-12"><div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div><p class="mt-4 text-slate-500">Traversing the neural pathways...</p></div>';
 
@@ -564,6 +934,36 @@
                     const title = item.url || "Untitled Node";
                     const snippet = item.content || "No preview available.";
                     const score = (item.score * 100).toFixed(1);
+                    
+                    // HTML转义辅助函数（先定义，后使用）
+                    const escapeHtml = (text) => {
+                        if (!text) return '';
+                        const div = document.createElement('div');
+                        div.textContent = text;
+                        return div.innerHTML;
+                    };
+                    
+                    // 处理高亮摘要（如果有）
+                    let highlightedSnippet = snippet;
+                    if (item.highlighted_snippet) {
+                        // 先将高亮标记替换为临时占位符
+                        const placeholderStart = '___HIGHLIGHT_START___';
+                        const placeholderEnd = '___HIGHLIGHT_END___';
+                        let textWithPlaceholders = item.highlighted_snippet
+                            .replace(/\[\[HIGHLIGHT\]\](.*?)\[\[\/HIGHLIGHT\]\]/gi, 
+                                     placeholderStart + '$1' + placeholderEnd);
+                        
+                        let escapedText = escapeHtml(textWithPlaceholders);
+                        
+                        // 将占位符替换为HTML标签
+                        highlightedSnippet = escapedText
+                            .replace(new RegExp(escapeHtml(placeholderStart), 'g'), 
+                                    '<strong class="font-bold text-cyan-400 bg-cyan-500/20 px-1 rounded">')
+                            .replace(new RegExp(escapeHtml(placeholderEnd), 'g'), '</strong>');
+                    } else {
+                        // 如果没有高亮摘要，也要转义HTML
+                        highlightedSnippet = escapeHtml(snippet);
+                    }
 
                     const card = document.createElement('div');
                     card.className = 'bg-slate-800/50 backdrop-blur-sm p-6 rounded-xl shadow-lg border border-slate-700/50 hover:shadow-xl hover:border-cyan-500/50 transition-all hover:-translate-y-1 duration-200 cursor-pointer';
@@ -576,37 +976,99 @@
                         }
                     };
 
-                    card.innerHTML = `
-                        <div class="flex justify-between items-start mb-2">
-                            <a href="/view/${item.id}" onclick="event.stopPropagation(); recordInteraction('${item.id}', '${item.url}')" class="text-lg font-bold text-cyan-400 hover:text-cyan-300 transition-colors line-clamp-1">${title}</a>
-                            <span class="bg-cyan-500/20 text-cyan-400 text-xs font-bold px-2 py-1 rounded-full border border-cyan-500/30">${score}% Match</span>
-                        </div>
-                        <div class="text-xs text-slate-400 mb-3 font-mono truncate">${item.url}</div>
-                        <p class="text-slate-300 text-sm leading-relaxed line-clamp-3">${snippet}</p>
-                        <div class="mt-4 pt-4 border-t border-slate-700/50 flex justify-between items-center">
-                            <span class="text-xs text-slate-400">ID: ${item.id.substring(0, 8)}...</span>
-                            <span class="text-sm font-medium text-slate-100 flex items-center gap-1">
-                                Explore Node 
-                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
-                            </span>
-                        </div>
+                    // 创建卡片元素
+                    const titleLink = document.createElement('a');
+                    titleLink.href = `/view/${item.id}`;
+                    titleLink.className = 'text-lg font-bold text-cyan-400 hover:text-cyan-300 transition-colors line-clamp-1';
+                    titleLink.textContent = title;
+                    titleLink.onclick = (e) => {
+                        e.stopPropagation();
+                        recordInteraction(item.id, item.url);
+                    };
+                    
+                    const scoreBadge = document.createElement('span');
+                    scoreBadge.className = 'bg-cyan-500/20 text-cyan-400 text-xs font-bold px-2 py-1 rounded-full border border-cyan-500/30';
+                    scoreBadge.textContent = `${score}% Match`;
+                    
+                    const headerDiv = document.createElement('div');
+                    headerDiv.className = 'flex justify-between items-start mb-2';
+                    headerDiv.appendChild(titleLink);
+                    headerDiv.appendChild(scoreBadge);
+                    
+                    const urlDiv = document.createElement('div');
+                    urlDiv.className = 'text-xs text-slate-400 mb-3 font-mono truncate';
+                    urlDiv.textContent = item.url;
+                    
+                    const snippetPara = document.createElement('p');
+                    snippetPara.className = 'text-slate-300 text-sm leading-relaxed line-clamp-3';
+                    snippetPara.innerHTML = highlightedSnippet; // 直接使用innerHTML支持HTML高亮
+                    
+                    const footerDiv = document.createElement('div');
+                    footerDiv.className = 'mt-4 pt-4 border-t border-slate-700/50 flex justify-between items-center';
+                    footerDiv.innerHTML = `
+                        <span class="text-xs text-slate-400">ID: ${item.id.substring(0, 8)}...</span>
+                        <span class="text-sm font-medium text-slate-100 flex items-center gap-1">
+                            Explore Node 
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+                        </span>
                     `;
+                    
+                    card.appendChild(headerDiv);
+                    card.appendChild(urlDiv);
+                    card.appendChild(snippetPara);
+                    card.appendChild(footerDiv);
+                    
                     resultsDiv.appendChild(card);
                 });
 
             } catch (e) {
                 resultsDiv.innerHTML = `<div class="text-center text-red-500 py-8">Neural Link Error: ${e.message}</div>`;
             }
+            
+            // Also prepare graph data in background
+            if (currentView === 'graph') {
+                renderGraphView(query);
+            }
         }
 
         async function uploadUrl() {
             const url = document.getElementById('url-input').value;
-            if (!url) return;
-            const formData = new FormData();
-            formData.append('url', url);
-            await fetch('/api/upload/url', { method: 'POST', body: formData });
-            document.getElementById('url-input').value = '';
-            showNotification("URL injected into the cortex. Processing...");
+            const password = document.getElementById('url-password').value;
+            
+            if (!url) {
+                showNotification("请输入URL", "error");
+                return;
+            }
+            
+            if (!password) {
+                showNotification("请输入密码", "error");
+                document.getElementById('url-password').focus();
+                return;
+            }
+            
+            try {
+                const formData = new FormData();
+                formData.append('url', url);
+                formData.append('password', password);
+                
+                const response = await fetch('/api/upload/url', { 
+                    method: 'POST', 
+                    body: formData 
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    document.getElementById('url-input').value = '';
+                    document.getElementById('url-password').value = '';
+                    showNotification(result.message || "URL injected into the cortex. Processing...");
+                } else {
+                    showNotification(result.detail || "密码错误，爬取被拒绝", "error");
+                }
+            } catch (error) {
+                console.error("Failed to upload URL", error);
+                showNotification("上传失败: " + error.message, "error");
+            }
         }
 
         async function uploadText() {
@@ -617,6 +1079,75 @@
             await fetch('/api/upload/text', { method: 'POST', body: formData });
             document.getElementById('text-input').value = '';
             showNotification("Text fragment absorbed. Processing...");
+        }
+
+        // CSV文件选择和上传
+        document.getElementById('csv-file-input').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                document.getElementById('csv-file-name').textContent = file.name;
+            }
+        });
+
+        async function uploadCSV() {
+            const fileInput = document.getElementById('csv-file-input');
+            const password = document.getElementById('csv-password').value;
+            const urlPrefix = document.getElementById('csv-url-prefix').value;
+            const uploadBtn = document.getElementById('csv-upload-btn');
+            
+            if (!fileInput.files || !fileInput.files[0]) {
+                showNotification("请选择CSV文件", "error");
+                return;
+            }
+            
+            if (!password) {
+                showNotification("请输入密码", "error");
+                document.getElementById('csv-password').focus();
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            
+            if (!file.name.endsWith('.csv')) {
+                showNotification("只支持CSV文件格式", "error");
+                return;
+            }
+            
+            try {
+                uploadBtn.disabled = true;
+                uploadBtn.textContent = '上传中...';
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('password', password);
+                if (urlPrefix) {
+                    formData.append('url_prefix', urlPrefix);
+                }
+                
+                const response = await fetch('/api/upload/csv', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification(result.message || "CSV文件已接收，正在批量导入...");
+                    // 清空表单
+                    fileInput.value = '';
+                    document.getElementById('csv-file-name').textContent = '选择CSV文件...';
+                    document.getElementById('csv-password').value = '';
+                    document.getElementById('csv-url-prefix').value = '';
+                } else {
+                    showNotification(result.detail || "CSV导入失败", "error");
+                }
+            } catch (error) {
+                console.error("Failed to upload CSV", error);
+                showNotification("上传失败: " + error.message, "error");
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '批量导入';
+            }
         }
 
         // Enter key to search
