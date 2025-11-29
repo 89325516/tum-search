@@ -20,6 +20,7 @@ load_dotenv()
 from system_manager import SystemManager, SPACE_R, SPACE_X
 from search_engine import search
 from csv_importer import CSVImporter
+from xml_dump_processor import MediaWikiDumpProcessor
 
 # 从环境变量读取爬取密码
 CRAWL_PASSWORD = os.getenv("CRAWL_PASSWORD", "")
@@ -200,6 +201,130 @@ def background_process_csv(file_path: str, url_prefix: str = ""):
         asyncio.run(ws_manager.broadcast({
             "type": "error",
             "message": f"CSV导入失败: {str(e)}"
+        }))
+
+
+def background_process_xml_dump(file_path: str, base_url: str = "", max_pages: int = None):
+    """
+    后台处理XML dump导入任务
+    """
+    start_time = time.time()
+    print(f"⏳ [XML Dump Import] Starting XML dump import from {file_path}")
+    
+    try:
+        # 初始化处理器
+        processor = MediaWikiDumpProcessor(
+            base_url=base_url,
+            wiki_type="auto"  # 自动检测Wiki类型
+        )
+        
+        # 进度回调函数
+        def progress_callback(current: int, total: int, message: str):
+            progress = int((current / total) * 100) if total > 0 else 0
+            asyncio.run(ws_manager.broadcast({
+                "type": "progress",
+                "count": current,
+                "total": total,
+                "message": f"XML Dump处理进度: {current}/{total} ({progress}%) - {message}"
+            }))
+        
+        # 处理dump文件
+        processor.process_dump(file_path, max_pages=max_pages, progress_callback=progress_callback)
+        
+        # 导入到数据库
+        asyncio.run(ws_manager.broadcast({
+            "type": "progress",
+            "message": "正在导入数据到数据库..."
+        }))
+        
+        mgr_instance = SystemManager()
+        stats = processor.import_to_database(
+            mgr_instance,
+            url_prefix=base_url or processor.base_url,
+            batch_size=50,
+            import_edges=False,  # 暂时不通过CSV导入边
+            edges_csv_path=None,
+            check_db_first=True  # 检查数据库，跳过已存在的URL
+        )
+        
+        # 导入边（链接关系）- 通过生成临时CSV然后导入
+        edge_count = 0
+        if processor.links:
+            asyncio.run(ws_manager.broadcast({
+                "type": "progress",
+                "message": "正在导入链接关系..."
+            }))
+            
+            # 生成临时边CSV文件
+            import tempfile
+            import csv
+            temp_edges_file = tempfile.NamedTemporaryFile(mode='w', suffix='.csv', delete=False, encoding='utf-8')
+            edges_writer = csv.writer(temp_edges_file)
+            edges_writer.writerow(['source_title', 'target_title'])
+            
+            for source_title, target_titles in processor.links.items():
+                for target_title in target_titles:
+                    if source_title in processor.pages and target_title in processor.pages:
+                        edges_writer.writerow([source_title, target_title])
+            
+            temp_edges_file.close()
+            
+            # 使用import_edges模块导入
+            try:
+                from import_edges import import_edges_from_csv
+                url_prefix_for_edges = base_url or processor.base_url
+                import_edges_from_csv(temp_edges_file.name, mgr_instance, base_url=url_prefix_for_edges)
+                # 计算边的总数
+                edge_count = sum(len(target_titles) for target_titles in processor.links.values())
+            except Exception as e:
+                print(f"⚠️  边导入失败: {e}")
+                import traceback
+                traceback.print_exc()
+            finally:
+                # 清理临时文件
+                if os.path.exists(temp_edges_file.name):
+                    os.remove(temp_edges_file.name)
+        
+        # 清理临时文件
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        # 发送完成通知
+        duration = time.time() - start_time
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        success_msg = (
+            f"✅ XML Dump导入完成 ({timestamp})\n"
+            f"处理页面: {processor.stats['processed_pages']}\n"
+            f"总页面: {processor.stats['total_pages']}\n"
+            f"成功导入: {stats['success']}\n"
+            f"跳过（已存在）: {stats.get('skipped', 0)}\n"
+            f"失败: {stats['failed']}\n"
+            f"链接关系: {edge_count}\n"
+            f"晋升到Space R: {stats['promoted']}\n"
+            f"处理时间: {duration:.2f}秒"
+        )
+        
+        asyncio.run(ws_manager.broadcast({
+            "type": "system_update",
+            "message": success_msg,
+            "timestamp": timestamp
+        }))
+        
+        print(f"✅ [XML Dump Import] Completed: {stats['success']} items, {edge_count} edges imported")
+        
+    except Exception as e:
+        print(f"❌ [XML Dump Import] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # 清理临时文件
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        asyncio.run(ws_manager.broadcast({
+            "type": "error",
+            "message": f"XML Dump导入失败: {str(e)}"
         }))
 
 
@@ -590,6 +715,45 @@ if args.mode == "user":
         # 异步处理CSV导入
         background_tasks.add_task(background_process_csv, file_path=file_path, url_prefix=url_prefix)
         return {"status": "processing", "message": f"CSV文件已接收，开始批量导入..."}
+
+    @app.post("/api/upload/xml-dump")
+    async def upload_xml_dump(
+        file: UploadFile = File(...),
+        password: str = Form(None),
+        base_url: str = Form(""),
+        max_pages: int = Form(None),
+        background_tasks: BackgroundTasks = None
+    ):
+        """
+        上传XML Dump文件（MediaWiki/Wikipedia格式）
+        自动解析并导入到数据库，无需借助爬虫
+        """
+        # 验证密码
+        if not CRAWL_PASSWORD:
+            raise HTTPException(status_code=500, detail="服务器未配置爬取密码，请联系管理员")
+        
+        if not password or password != CRAWL_PASSWORD:
+            raise HTTPException(status_code=403, detail="密码错误，XML Dump导入被拒绝")
+        
+        # 检查文件类型
+        filename_lower = file.filename.lower()
+        if not (filename_lower.endswith('.xml') or filename_lower.endswith('.xml.bz2') or filename_lower.endswith('.xml.gz')):
+            raise HTTPException(status_code=400, detail="只支持XML格式的dump文件（.xml, .xml.bz2, .xml.gz）")
+        
+        # 保存临时文件
+        os.makedirs("temp_uploads", exist_ok=True)
+        file_path = f"temp_uploads/{file.filename}"
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # 异步处理XML dump导入
+        background_tasks.add_task(
+            background_process_xml_dump,
+            file_path=file_path,
+            base_url=base_url,
+            max_pages=max_pages if max_pages else None
+        )
+        return {"status": "processing", "message": f"XML Dump文件已接收，开始解析和导入..."}
 
 
 elif args.mode == "admin":

@@ -209,8 +209,21 @@ class MediaWikiDumpProcessor:
         if not os.path.exists(dump_path):
             raise FileNotFoundError(f"文件不存在: {dump_path}")
         
+        # 根据文件扩展名选择正确的打开方式（支持压缩文件）
+        dump_path_lower = dump_path.lower()
+        if dump_path_lower.endswith('.bz2'):
+            import bz2
+            file_opener = lambda path: bz2.open(path, 'rt', encoding='utf-8')
+            print("📦 检测到 bzip2 压缩文件")
+        elif dump_path_lower.endswith('.gz'):
+            import gzip
+            file_opener = lambda path: gzip.open(path, 'rt', encoding='utf-8')
+            print("📦 检测到 gzip 压缩文件")
+        else:
+            file_opener = lambda path: open(path, 'rb')
+        
         # 打开dump文件
-        with open(dump_path, 'rb') as f:
+        with file_opener(dump_path) as f:
             dump = mwxml.Dump.from_file(f)
             
             # 显示站点信息并检测Wiki类型
@@ -282,6 +295,9 @@ class MediaWikiDumpProcessor:
                     'revision_id': latest_revision.id,
                     'timestamp': str(latest_revision.timestamp) if latest_revision.timestamp else None
                 }
+                
+                # 填充 title_to_url 映射（用于边导入）
+                self.title_to_url[title] = url
                 
                 # 存储链接关系
                 if page_links:

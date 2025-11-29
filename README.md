@@ -23,8 +23,24 @@ A specialized search engine and knowledge graph system for the Technical Univers
 
 1.  Install dependencies:
     ```bash
+    # 方法1: 使用安装脚本（推荐）
+    bash install_deps.sh
+    
+    # 方法2: 手动安装
     pip install -r requirements.txt
+    
+    # 方法3: 只安装Wiki Dump功能所需依赖
+    pip install mwxml mwparserfromhell fastapi uvicorn python-multipart qdrant-client python-dotenv
+    
+    # 验证安装
+    python3 check_dependencies.py
     ```
+    
+    **注意**: Wiki Dump上传功能需要额外的依赖：
+    - `mwxml` - MediaWiki XML dump解析
+    - `mwparserfromhell` - Wikicode解析
+    
+    如果安装失败，请查看 `INSTALL_DEPENDENCIES.md` 获取详细说明。
 
 2.  Configure environment variables in `.env`:
     ```bash

@@ -258,6 +258,41 @@
                         </div>
                     </div>
                 </div>
+                <!-- XML Dump Upload -->
+                <div class="bg-slate-800/50 backdrop-blur-sm p-6 rounded-xl border border-slate-700/50 md:col-span-2">
+                    <h3 class="font-semibold mb-4 flex items-center text-slate-100">
+                        <span class="bg-purple-100 text-purple-800 text-xs font-medium mr-2 px-2.5 py-0.5 rounded">XML</span>
+                        Wiki Dump Import
+                    </h3>
+                    <div class="space-y-3">
+                        <div class="flex gap-2 items-center">
+                            <input type="file" id="xml-dump-file-input" accept=".xml,.bz2,.gz"
+                                class="hidden">
+                            <label for="xml-dump-file-input"
+                                class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 cursor-pointer hover:bg-slate-700/70 transition-colors">
+                                <span id="xml-dump-file-name" class="text-slate-400">选择XML Dump文件...</span>
+                            </label>
+                            <button onclick="document.getElementById('xml-dump-file-input').click()"
+                                class="text-white bg-purple-600 hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-4 py-2.5">选择文件</button>
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="xml-dump-base-url"
+                                class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
+                                placeholder="Wiki基础URL (可选，例如: https://wiki.example.com)">
+                            <input type="number" id="xml-dump-max-pages"
+                                class="w-32 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
+                                placeholder="最大页面数（可选，测试用）">
+                            <input type="password" id="xml-dump-password"
+                                class="flex-1 bg-slate-700/50 border border-slate-600/50 text-slate-100 text-sm rounded-lg focus:ring-cyan-500 focus:border-cyan-500/50 block p-2.5 placeholder:text-slate-500"
+                                placeholder="输入密码...">
+                            <button onclick="uploadXMLDump()" id="xml-dump-upload-btn"
+                                class="text-white bg-purple-600 hover:bg-purple-700 focus:ring-4 focus:ring-purple-300 font-medium rounded-lg text-sm px-5 py-2.5">导入Dump</button>
+                        </div>
+                        <div class="text-xs text-slate-400">
+                            💡 支持MediaWiki/Wikipedia XML Dump文件（.xml, .xml.bz2, .xml.gz）。自动解析页面和链接关系，无需爬虫。
+                        </div>
+                    </div>
+                </div>
                 <!-- URL Injection -->
                 <div class="bg-slate-800/50 backdrop-blur-sm p-6 rounded-xl border border-slate-700/50">
                     <h3 class="font-semibold mb-4 flex items-center">
@@ -1150,9 +1185,93 @@
             }
         }
 
+        async function uploadXMLDump() {
+            const fileInput = document.getElementById('xml-dump-file-input');
+            const password = document.getElementById('xml-dump-password').value;
+            const baseUrl = document.getElementById('xml-dump-base-url').value;
+            const maxPages = document.getElementById('xml-dump-max-pages').value;
+            const uploadBtn = document.getElementById('xml-dump-upload-btn');
+            
+            if (!fileInput.files || !fileInput.files[0]) {
+                showNotification("请选择XML Dump文件", "error");
+                return;
+            }
+            
+            if (!password) {
+                showNotification("请输入密码", "error");
+                document.getElementById('xml-dump-password').focus();
+                return;
+            }
+            
+            const file = fileInput.files[0];
+            
+            // 检查文件扩展名
+            const validExtensions = ['.xml', '.bz2', '.gz'];
+            const fileName = file.name.toLowerCase();
+            const hasValidExtension = validExtensions.some(ext => fileName.endsWith(ext)) || 
+                                     fileName.endsWith('.xml.bz2') || fileName.endsWith('.xml.gz');
+            
+            if (!hasValidExtension) {
+                showNotification("只支持XML格式的dump文件（.xml, .xml.bz2, .xml.gz）", "error");
+                return;
+            }
+            
+            try {
+                uploadBtn.disabled = true;
+                uploadBtn.textContent = '上传中...';
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('password', password);
+                if (baseUrl) {
+                    formData.append('base_url', baseUrl);
+                }
+                if (maxPages) {
+                    formData.append('max_pages', maxPages);
+                }
+                
+                const response = await fetch('/api/upload/xml-dump', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showNotification(result.message || "XML Dump文件已接收，正在解析和导入...");
+                    // 清空表单
+                    fileInput.value = '';
+                    document.getElementById('xml-dump-file-name').textContent = '选择XML Dump文件...';
+                    document.getElementById('xml-dump-password').value = '';
+                    document.getElementById('xml-dump-base-url').value = '';
+                    document.getElementById('xml-dump-max-pages').value = '';
+                } else {
+                    showNotification(result.detail || "XML Dump导入失败", "error");
+                }
+            } catch (error) {
+                console.error("Failed to upload XML Dump", error);
+                showNotification("上传失败: " + error.message, "error");
+            } finally {
+                uploadBtn.disabled = false;
+                uploadBtn.textContent = '导入Dump';
+            }
+        }
+
         // Enter key to search
         document.getElementById('search-input').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') performSearch();
+        });
+
+        // CSV file input change handler
+        document.getElementById('csv-file-input').addEventListener('change', function(e) {
+            const fileName = e.target.files[0] ? e.target.files[0].name : '选择CSV文件...';
+            document.getElementById('csv-file-name').textContent = fileName;
+        });
+
+        // XML Dump file input change handler
+        document.getElementById('xml-dump-file-input').addEventListener('change', function(e) {
+            const fileName = e.target.files[0] ? e.target.files[0].name : '选择XML Dump文件...';
+            document.getElementById('xml-dump-file-name').textContent = fileName;
         });
 
         // Load feed on start
