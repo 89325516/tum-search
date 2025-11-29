@@ -9,7 +9,8 @@ from qdrant_client.http import models
 import google.generativeai as genai
 from transformers import CLIPProcessor, CLIPModel
 from PIL import Image
-from crawler import SmartCrawler  # 确保 crawler.py 在同级目录下
+# 使用新的模块化爬虫（向后兼容的同步接口）
+from crawler_v2 import SyncCrawlerWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,15 @@ print("🛠️System Initialization: Connecting to database & loading models..."
 client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-crawler = SmartCrawler()
+# 使用新的模块化爬虫（自动启用robots.txt和内容去重）
+crawler = SyncCrawlerWrapper(
+    concurrency=5,
+    delay=1.0,
+    enable_robots=True,  # 启用robots.txt支持
+    enable_content_dedup=True,  # 启用内容去重
+    same_domain_only=True,
+    max_cache_size=3000
+)
 from interaction_manager import InteractionManager
 
 def get_embedding(text=None, image_path=None):
