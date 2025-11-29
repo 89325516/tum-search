@@ -83,7 +83,8 @@ def background_process_content(task_type: str, content: str = None, file_path: s
                 })
             
             # Run recursive crawl (启用数据库检查以跳过已存在的URL)
-            mgr.process_url_recursive(url, max_depth=1, callback=lambda c, u: asyncio.run(progress_callback(c, u)), check_db_first=True)
+            # 增加爬取深度到8层，支持更深的内容发现，增加页面数量上限
+            mgr.process_url_recursive(url, max_depth=8, max_pages=1000, callback=lambda c, u: asyncio.run(progress_callback(c, u)), check_db_first=True)
             
             # Get total count
             total_count = mgr.client.count(collection_name=SPACE_X).count

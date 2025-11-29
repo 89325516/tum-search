@@ -618,13 +618,15 @@ class SystemManager:
             
         print(f"✅ Backfill complete. Updated {count} items.")
 
-    def process_url_recursive(self, start_url, max_depth=1, callback=None, check_db_first=True):
+    def process_url_recursive(self, start_url, max_depth=8, max_pages=None, callback=None, check_db_first=True):
         """
         Recursively crawl and process URLs up to max_depth.
         callback(count, url): function to call on successful addition.
         check_db_first: 是否先检查数据库，如果URL已存在则跳过爬取
+        max_depth: 最大爬取深度（默认8层，可扩展到10层）
+        max_pages: 最大爬取页面数（None表示不限制）
         """
-        print(f"🕸️ Starting recursive crawl: {start_url} (Depth: {max_depth})")
+        print(f"🕸️ Starting recursive crawl: {start_url} (Depth: {max_depth}, Max Pages: {max_pages or 'unlimited'})")
         if check_db_first:
             print(f"   ✅ 已启用数据库检查，将跳过已存在的URL")
         
@@ -636,6 +638,10 @@ class SystemManager:
         count = 0
         
         while queue:
+            # 检查是否达到最大页面数限制
+            if max_pages and count >= max_pages:
+                print(f"   ✅ 已达到最大页面数限制: {max_pages}")
+                break
             current_url, depth = queue.pop(0)
             
             if current_url in visited:
