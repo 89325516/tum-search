@@ -643,15 +643,15 @@
 
         // WebSocket connection handlers
         ws.onopen = function() {
-            console.log('WebSocket connected');
+            console.log('✅ WebSocket connected successfully');
         };
 
         ws.onerror = function(error) {
-            console.error('WebSocket error:', error);
+            console.error('❌ WebSocket error:', error);
         };
 
-        ws.onclose = function() {
-            console.log('WebSocket closed');
+        ws.onclose = function(event) {
+            console.log('⚠️ WebSocket closed:', event.code, event.reason);
         };
 
         ws.onmessage = function (event) {
@@ -667,9 +667,11 @@
                 }
                 
                 progressToast.classList.remove('translate-y-24', 'opacity-0');
+                console.log('Processing progress message:', data);
 
                 // Check if this is URL crawling progress with detailed info
                 if (data.task_type === 'url' && data.total !== undefined) {
+                    console.log('URL crawling progress detected, updating progress bar...');
                     // Use determinate progress bar for URL crawling
                     if (progressBarContainer) progressBarContainer.classList.remove('hidden');
                     if (progressBarIndeterminate) progressBarIndeterminate.classList.add('hidden');

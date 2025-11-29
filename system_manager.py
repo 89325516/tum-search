@@ -685,7 +685,14 @@ class SystemManager:
             try:
                 # 1. Crawl
                 print(f"   🔍 Crawling: {current_url}")
-                data = self.crawler.parse(current_url)
+                try:
+                    data = self.crawler.parse(current_url)
+                except Exception as crawl_err:
+                    print(f"   ❌ Crawler error for {current_url}: {crawl_err}")
+                    import traceback
+                    traceback.print_exc()
+                    continue
+                    
                 if not data:
                     print(f"   ⚠️  No data retrieved from: {current_url}")
                     continue

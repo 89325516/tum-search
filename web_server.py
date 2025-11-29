@@ -160,8 +160,23 @@ def background_process_content(task_type: str, content: str = None, file_path: s
             else:
                 print(f"✅ [URL Task] WebSocket connection(s) ready: {len(ws_manager.active_connections)}")
             
-            # 立即发送开始消息
+            # 立即发送开始消息（确保前端收到更新）
             print(f"📢 [URL Task] About to send initial progress message...")
+            for attempt in range(3):  # 尝试发送3次，确保消息到达
+                broadcast_sync({
+                    "type": "progress",
+                    "task_type": "url",
+                    "count": 0,
+                    "total": total_pages,
+                    "percent": 0,
+                    "message": "Initializing crawler...",
+                    "current_url": url
+                })
+                time.sleep(0.1)  # 短暂延迟
+            
+            print("✅ [URL Task] Initial progress message sent")
+            
+            # 再发送一个"Starting crawl"消息
             broadcast_sync({
                 "type": "progress",
                 "task_type": "url",
@@ -171,10 +186,9 @@ def background_process_content(task_type: str, content: str = None, file_path: s
                 "message": "Starting URL crawl...",
                 "current_url": url
             })
-            print("✅ [URL Task] Initial progress message sent")
             
             # 等待一小段时间，确保消息被发送
-            time.sleep(0.2)
+            time.sleep(0.3)
             
             # Define callback to send progress via WebSocket
             def progress_callback(count, current_url):
@@ -204,23 +218,37 @@ def background_process_content(task_type: str, content: str = None, file_path: s
                 })
                 print(f"✅ [URL Task] Progress updated: {count}/{total_pages} ({percent}%) - {display_url[:50]}")
             
-            # Send "connecting" status update before starting crawl
+            # 不再需要单独的"connecting"消息，已经在上面的消息中包含了
+            
+            # 在爬虫真正开始前，再发送一个"开始爬取"的消息
             broadcast_sync({
                 "type": "progress",
                 "task_type": "url",
                 "count": 0,
                 "total": total_pages,
                 "percent": 0,
-                "message": "Connecting to crawler...",
+                "message": "Crawler starting...",
                 "current_url": url
             })
-            print("✅ [URL Task] Connection status message sent")
             
             # Run recursive crawl (启用数据库检查以跳过已存在的URL)
             # 增加爬取深度到8层，支持更深的内容发现，增加页面数量上限
             print(f"🚀 [URL Task] Starting crawl for: {url}")
-            processed_count = mgr.process_url_recursive(url, max_depth=8, max_pages=max_pages, callback=progress_callback, check_db_first=True)
-            print(f"✅ [URL Task] Crawl completed. Processed {processed_count} pages.")
+            try:
+                processed_count = mgr.process_url_recursive(url, max_depth=8, max_pages=max_pages, callback=progress_callback, check_db_first=True)
+                print(f"✅ [URL Task] Crawl completed. Processed {processed_count} pages.")
+            except Exception as crawl_error:
+                print(f"❌ [URL Task] Crawl failed with error: {crawl_error}")
+                import traceback
+                traceback.print_exc()
+                # 发送错误消息
+                broadcast_sync({
+                    "type": "error",
+                    "task_type": "url",
+                    "message": f"Crawler failed: {str(crawl_error)}"
+                })
+                processed_count = 0
+                raise  # 重新抛出异常以便上层处理
             
             # Get total count
             total_count = mgr.client.count(collection_name=SPACE_X).count
@@ -402,11 +430,13 @@ def background_process_xml_dump(file_path: str, base_url: str = "", max_pages: i
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
+    print(f"✅ [WebSocket] New connection established. Total connections: {len(ws_manager.active_connections)}")
     try:
         while True:
             await websocket.receive_text()  # 保持连接，虽不接收消息
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
+        print(f"⚠️ [WebSocket] Connection disconnected. Remaining connections: {len(ws_manager.active_connections)}")
 
 @app.get("/api/search")
 async def api_search(q: str):
