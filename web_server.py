@@ -617,7 +617,6 @@ if args.mode == "user":
     @app.post("/api/upload/xml-dump")
     async def upload_xml_dump(
         file: UploadFile = File(...),
-        password: str = Form(None),
         base_url: str = Form(""),
         max_pages: int = Form(None),
         background_tasks: BackgroundTasks = None
@@ -626,13 +625,6 @@ if args.mode == "user":
         上传XML Dump文件（MediaWiki/Wikipedia格式）
         自动解析并导入到数据库，无需借助爬虫
         """
-        # 验证密码
-        if not CRAWL_PASSWORD:
-            raise HTTPException(status_code=500, detail="服务器未配置爬取密码，请联系管理员")
-        
-        if not password or password != CRAWL_PASSWORD:
-            raise HTTPException(status_code=403, detail="密码错误，XML Dump导入被拒绝")
-        
         # 检查文件类型
         filename_lower = file.filename.lower()
         if not (filename_lower.endswith('.xml') or filename_lower.endswith('.xml.bz2') or filename_lower.endswith('.xml.gz')):
