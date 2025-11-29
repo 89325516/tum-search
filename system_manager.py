@@ -47,15 +47,25 @@ print("🛠️System Initialization: Connecting to database & loading models..."
 client = QdrantClient(url=QDRANT_URL, api_key=QDRANT_API_KEY)
 clip_model = CLIPModel.from_pretrained("openai/clip-vit-base-patch32")
 clip_processor = CLIPProcessor.from_pretrained("openai/clip-vit-base-patch32")
-# 使用新的模块化爬虫（自动启用robots.txt和内容去重）
-crawler = SyncCrawlerWrapper(
-    concurrency=5,
-    delay=1.0,
-    enable_robots=True,  # 启用robots.txt支持
-    enable_content_dedup=True,  # 启用内容去重
-    same_domain_only=True,
-    max_cache_size=3000
-)
+# 使用新的模块化爬虫（暂时禁用robots.txt以排查问题）
+try:
+    from crawler_v2 import SyncCrawlerWrapper
+    crawler = SyncCrawlerWrapper(
+        concurrency=5,
+        delay=1.0,
+        enable_robots=False,  # 暂时禁用robots.txt（可能有问题）
+        enable_content_dedup=True,  # 启用内容去重
+        same_domain_only=True,
+        max_cache_size=3000,
+        verify_ssl=False  # 暂时禁用SSL验证以排查问题
+    )
+    print("✅ Using new modular crawler (crawler_v2)")
+except Exception as e:
+    print(f"⚠️ Failed to load new crawler: {e}")
+    print("   Falling back to old crawler...")
+    from crawler import SmartCrawler
+    crawler = SmartCrawler()
+    print("✅ Using old crawler (crawler.SmartCrawler)")
 from interaction_manager import InteractionManager
 
 def get_embedding(text=None, image_path=None):
@@ -737,7 +747,9 @@ class SystemManager:
                 # 1. Crawl
                 print(f"   🔍 Crawling: {current_url}")
                 try:
+                    print(f"   📞 Calling crawler.parse()...")
                     data = self.crawler.parse(current_url)
+                    print(f"   ✅ Crawler.parse() returned: {type(data)}")
                 except Exception as crawl_err:
                     print(f"   ❌ Crawler error for {current_url}: {crawl_err}")
                     import traceback

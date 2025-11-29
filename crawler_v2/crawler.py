@@ -429,7 +429,9 @@ class AsyncCrawler:
         Returns:
             成功爬取的结果列表
         """
-        async with aiohttp.ClientSession() as session:
+        # 配置SSL连接器
+        connector = aiohttp.TCPConnector(ssl=False if not self.verify_ssl else None)
+        async with aiohttp.ClientSession(connector=connector) as session:
             tasks = [self.process_url(session, url) for url in urls]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
@@ -475,7 +477,9 @@ class AsyncCrawler:
         if same_domain_only is None:
             same_domain_only = self.link_filter.same_domain_only
         
-        async with aiohttp.ClientSession() as session:
+        # 配置SSL连接器
+        connector = aiohttp.TCPConnector(ssl=False if not self.verify_ssl else None)
+        async with aiohttp.ClientSession(connector=connector) as session:
             while queue:
                 if max_pages and count >= max_pages:
                     break
