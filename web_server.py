@@ -19,7 +19,6 @@ load_dotenv()
 # 引入核心模块
 from system_manager import SystemManager, SPACE_R, SPACE_X
 from search_engine import search
-from csv_importer import CSVImporter
 from xml_dump_processor import MediaWikiDumpProcessor
 
 # 从环境变量读取爬取密码
@@ -101,10 +100,6 @@ def background_process_content(task_type: str, content: str = None, file_path: s
             # 清理临时文件
             if os.path.exists(file_path):
                 os.remove(file_path)
-        elif task_type == "csv":
-            # CSV导入已在background_process_csv中处理
-            pass
-
         # 任务完成，准备通知消息
         duration = time.time() - start_time
         timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -132,75 +127,6 @@ def background_process_content(task_type: str, content: str = None, file_path: s
         asyncio.run(ws_manager.broadcast({
             "type": "error",
             "message": f"Processing failed: {str(e)}"
-        }))
-
-
-def background_process_csv(file_path: str, url_prefix: str = ""):
-    """
-    后台处理CSV导入任务
-    """
-    start_time = time.time()
-    print(f"⏳ [CSV Import] Starting CSV import from {file_path}")
-    
-    try:
-        importer = CSVImporter(mgr)
-        
-        # 进度回调函数
-        def progress_callback(current: int, total: int, message: str):
-            progress = int((current / total) * 100) if total > 0 else 0
-            asyncio.run(ws_manager.broadcast({
-                "type": "progress",
-                "count": current,
-                "total": total,
-                "message": f"CSV导入进度: {current}/{total} ({progress}%) - {message}"
-            }))
-        
-        # 导入CSV文件
-        stats = importer.import_csv_file(
-            file_path=file_path,
-            batch_size=50,
-            progress_callback=progress_callback,
-            default_url_prefix=url_prefix,
-            promote_novel=True
-        )
-        
-        # 清理临时文件
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        
-        # 发送完成通知
-        duration = time.time() - start_time
-        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        success_msg = (
-            f"✅ CSV导入完成 ({timestamp})\n"
-            f"总行数: {stats['total']}\n"
-            f"成功导入: {stats['success']}\n"
-            f"失败: {stats['failed']}\n"
-            f"晋升到Space R: {stats['promoted']}\n"
-            f"处理时间: {duration:.2f}秒"
-        )
-        
-        asyncio.run(ws_manager.broadcast({
-            "type": "system_update",
-            "message": success_msg,
-            "timestamp": timestamp
-        }))
-        
-        print(f"✅ [CSV Import] Completed: {stats['success']}/{stats['total']} items imported")
-        
-    except Exception as e:
-        print(f"❌ [CSV Import] Error: {e}")
-        import traceback
-        traceback.print_exc()
-        
-        # 清理临时文件
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        
-        asyncio.run(ws_manager.broadcast({
-            "type": "error",
-            "message": f"CSV导入失败: {str(e)}"
         }))
 
 
@@ -687,34 +613,6 @@ if args.mode == "user":
             shutil.copyfileobj(file.file, buffer)
         background_tasks.add_task(background_process_content, "image", file_path=file_path)
         return {"status": "processing", "message": "Image received. Processing..."}
-
-    @app.post("/api/upload/csv")
-    async def upload_csv(
-        file: UploadFile = File(...), 
-        password: str = Form(None),
-        url_prefix: str = Form(""),
-        background_tasks: BackgroundTasks = None
-    ):
-        # 验证密码
-        if not CRAWL_PASSWORD:
-            raise HTTPException(status_code=500, detail="服务器未配置爬取密码，请联系管理员")
-        
-        if not password or password != CRAWL_PASSWORD:
-            raise HTTPException(status_code=403, detail="密码错误，CSV导入被拒绝")
-        
-        # 检查文件类型
-        if not file.filename.endswith('.csv'):
-            raise HTTPException(status_code=400, detail="只支持CSV文件格式")
-        
-        # 保存临时文件
-        os.makedirs("temp_uploads", exist_ok=True)
-        file_path = f"temp_uploads/{file.filename}"
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-        
-        # 异步处理CSV导入
-        background_tasks.add_task(background_process_csv, file_path=file_path, url_prefix=url_prefix)
-        return {"status": "processing", "message": f"CSV文件已接收，开始批量导入..."}
 
     @app.post("/api/upload/xml-dump")
     async def upload_xml_dump(
