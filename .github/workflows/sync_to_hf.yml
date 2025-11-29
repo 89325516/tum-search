@@ -13,12 +13,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          fetch-depth: 1 # 只拉取最新代码，不拉取历史记录 (避免大文件历史)
-          lfs: false
+          fetch-depth: 0 # 必须拉取完整的 git 历史记录
+          lfs: true      # 如果你有大文件，开启 LFS (Large File Storage)
 
       - name: Push to hub
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          HF_TOKEN: ${{ secrets.HF_TOKEN }} # 引用刚才设置的 Secret
+          # 下面替换成你的 Hugging Face 用户名和 Space 名称
           HF_USERNAME: "YuanhaoChen" 
           HF_SPACE_NAME: "SmartPagerankSearch"
         run: |
@@ -28,9 +29,13 @@ jobs:
           
           # 强制创建一个全新的 orphan 分支，不包含任何历史记录
           git checkout --orphan hf-sync-branch
+          
+          # Remove any potential binary files that might have been checked out or generated
+          rm -f visual_rank_engine.so
+          find . -name "*.so" -type f -delete
+          rm -rf visual_rank_engine/target
+
           git add .
           git commit -m "Sync from GitHub Actions (Clean Commit)"
-          
-          # 添加远程仓库并强制推送
           git remote add space https://$HF_USERNAME:$HF_TOKEN@huggingface.co/spaces/$HF_USERNAME/$HF_SPACE_NAME
           git push --force space hf-sync-branch:main

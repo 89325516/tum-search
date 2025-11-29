@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>粒子效果测试页面</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background: #0f172a;
+        }
+        #particle-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            background: #0f172a;
+        }
+        .test-info {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 100;
+            color: white;
+            font-family: monospace;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="particle-canvas"></canvas>
+    <div class="test-info">
+        <h3>粒子效果测试</h3>
+        <div id="status">正在初始化...</div>
+        <div id="particle-count">粒子数: 0</div>
+        <div id="canvas-size">Canvas尺寸: -</div>
+    </div>
+
+    <script>
+        (function() {
+            const statusDiv = document.getElementById('status');
+            const countDiv = document.getElementById('particle-count');
+            const sizeDiv = document.getElementById('canvas-size');
+            
+            function updateStatus(msg) {
+                statusDiv.textContent = msg;
+                console.log('[Particle Test]', msg);
+            }
+            
+            function updateCount(count) {
+                countDiv.textContent = `粒子数: ${count}`;
+            }
+            
+            function updateSize(w, h) {
+                sizeDiv.textContent = `Canvas尺寸: ${w}x${h}`;
+            }
+            
+            updateStatus('查找Canvas元素...');
+            const canvas = document.getElementById('particle-canvas');
+            if (!canvas) {
+                updateStatus('❌ Canvas元素未找到！');
+                return;
+            }
+            updateStatus('✅ Canvas元素找到');
+            
+            updateStatus('获取2D上下文...');
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                updateStatus('❌ 无法获取2D上下文！');
+                return;
+            }
+            updateStatus('✅ 2D上下文获取成功');
+            
+            let animationFrameId;
+            let width, height;
+            let particles = [];
+            const particleCount = 60;
+            const connectionDistance = 150;
+            const mouseDistance = 200;
+            let mouse = { x: null, y: null };
+
+            const resize = () => {
+                width = window.innerWidth;
+                height = window.innerHeight;
+                canvas.width = width;
+                canvas.height = height;
+                updateSize(width, height);
+                initParticles();
+            };
+
+            class Particle {
+                constructor() {
+                    this.x = Math.random() * width;
+                    this.y = Math.random() * height;
+                    this.vx = (Math.random() - 0.5) * 0.5;
+                    this.vy = (Math.random() - 0.5) * 0.5;
+                    this.size = Math.random() * 2 + 1;
+                    this.color = `rgba(${Math.random() * 50 + 100}, ${Math.random() * 100 + 155}, 255, ${Math.random() * 0.5 + 0.2})`;
+                }
+
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    if (this.x < 0 || this.x > width) this.vx *= -1;
+                    if (this.y < 0 || this.y > height) this.vy *= -1;
+
+                    if (mouse.x != null) {
+                        let dx = mouse.x - this.x;
+                        let dy = mouse.y - this.y;
+                        let distance = Math.sqrt(dx * dx + dy * dy);
+                        if (distance < mouseDistance && distance > 0) {
+                            const forceDirectionX = dx / distance;
+                            const forceDirectionY = dy / distance;
+                            const force = (mouseDistance - distance) / mouseDistance;
+                            this.vx += forceDirectionX * force * 0.6;
+                            this.vy += forceDirectionY * force * 0.6;
+                        }
+                    }
+                    
+                    // 限制速度
+                    const maxSpeed = 2.0;
+                    const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+                    if (speed > maxSpeed) {
+                        this.vx = (this.vx / speed) * maxSpeed;
+                        this.vy = (this.vy / speed) * maxSpeed;
+                    }
+                }
+
+                draw() {
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                    ctx.fillStyle = this.color;
+                    ctx.fill();
+                }
+            }
+
+            const initParticles = () => {
+                particles = [];
+                for (let i = 0; i < particleCount; i++) {
+                    particles.push(new Particle());
+                }
+                updateCount(particles.length);
+                updateStatus('✅ 粒子初始化完成');
+            };
+
+            const animate = () => {
+                ctx.clearRect(0, 0, width, height);
+                
+                // 绘制连接线
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        let dx = particles[i].x - particles[j].x;
+                        let dy = particles[i].y - particles[j].y;
+                        let distance = Math.sqrt(dx * dx + dy * dy);
+
+                        if (distance < connectionDistance) {
+                            ctx.beginPath();
+                            ctx.strokeStyle = `rgba(100, 200, 255, ${1 - distance / connectionDistance})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                // 更新和绘制粒子
+                particles.forEach(particle => {
+                    particle.update();
+                    particle.draw();
+                });
+
+                animationFrameId = requestAnimationFrame(animate);
+            };
+
+            const handleMouseMove = (e) => {
+                mouse.x = e.clientX || e.x;
+                mouse.y = e.clientY || e.y;
+            };
+
+            const handleMouseLeave = () => {
+                mouse.x = null;
+                mouse.y = null;
+            };
+
+            updateStatus('绑定事件监听器...');
+            window.addEventListener('resize', resize);
+            window.addEventListener('mousemove', handleMouseMove);
+            window.addEventListener('mouseleave', handleMouseLeave);
+
+            updateStatus('启动动画...');
+            resize();
+            animate();
+            updateStatus('✅ 动画已启动 - 应该能看到粒子效果了！');
+        })();
+    </script>
+</body>
+</html>
