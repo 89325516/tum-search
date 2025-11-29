@@ -88,15 +88,25 @@ class SystemManager:
 
     def _init_collections(self):
         """初始化 Qdrant 集合"""
-        for name in [SPACE_X, SPACE_R]:
-            if not self.client.collection_exists(name):
-                self.client.create_collection(
-                    collection_name=name,
-                    vectors_config={
-                        "clip": models.VectorParams(size=512, distance=models.Distance.COSINE)
-                    }
-                )
-                print(f"✅ Collection {name} created successfully!")
+        try:
+            for name in [SPACE_X, SPACE_R]:
+                try:
+                    if not self.client.collection_exists(name):
+                        self.client.create_collection(
+                            collection_name=name,
+                            vectors_config={
+                                "clip": models.VectorParams(size=512, distance=models.Distance.COSINE)
+                            }
+                        )
+                        print(f"✅ Collection {name} created successfully!")
+                    else:
+                        print(f"✅ Collection {name} already exists")
+                except Exception as e:
+                    print(f"⚠️  [Database] Error initializing collection {name}: {e}")
+                    print(f"   ⚠️  Please check your QDRANT_URL and QDRANT_API_KEY in .env file")
+        except Exception as e:
+            print(f"❌ [Database] Critical error: Cannot connect to Qdrant: {e}")
+            print(f"   ⚠️  Please check your QDRANT_URL and QDRANT_API_KEY in .env file")
 
     def _ensure_indices(self):
         """Ensure necessary payload indices exist."""
@@ -429,25 +439,51 @@ class SystemManager:
             collection_name: 要查询的集合名称（默认SPACE_X）
             
         Returns:
-            bool: 如果URL存在返回True，否则返回False
+            bool: 如果URL存在返回True，否则返回False。如果数据库连接失败，返回False以允许继续爬取。
         """
         try:
-            points, _ = self.client.scroll(
-                collection_name=collection_name,
-                scroll_filter=models.Filter(
-                    must=[
-                        models.FieldCondition(
-                            key="url",
-                            match=models.MatchValue(value=url)
-                        )
-                    ]
-                ),
-                limit=1
-            )
-            return len(points) > 0
+            # 使用线程安全的超时机制
+            from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+            
+            def check_in_thread():
+                """在线程中执行数据库查询"""
+                try:
+                    points, _ = self.client.scroll(
+                        collection_name=collection_name,
+                        scroll_filter=models.Filter(
+                            must=[
+                                models.FieldCondition(
+                                    key="url",
+                                    match=models.MatchValue(value=url)
+                                )
+                            ]
+                        ),
+                        limit=1
+                    )
+                    return len(points) > 0
+                except Exception as inner_e:
+                    raise inner_e
+            
+            # 使用线程池执行，设置3秒超时
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(check_in_thread)
+                try:
+                    result = future.result(timeout=3.0)  # 3秒超时
+                    return result
+                except FutureTimeoutError:
+                    print(f"⚠️  [Database Check] Timeout (3s) checking URL: {url[:50]}...")
+                    print(f"   ⚠️  Continuing without database check to avoid blocking...")
+                    return False
         except Exception as e:
-            print(f"⚠️ Error checking URL existence: {e}")
-            return False
+            error_msg = str(e)
+            if "timeout" in error_msg.lower() or "connection" in error_msg.lower():
+                print(f"⚠️  [Database Check] Connection error checking URL: {url[:50]}...")
+                print(f"   Error: {error_msg}")
+                print(f"   ⚠️  Please check QDRANT_URL and QDRANT_API_KEY in .env file")
+            else:
+                print(f"⚠️  [Database Check] Error checking URL existence for {url[:50]}...: {error_msg}")
+            print(f"   ⚠️  Continuing without database check to avoid blocking crawler...")
+            return False  # 出错时返回False，允许继续爬取，不阻塞爬虫
     
     def get_url_from_db(self, url: str, collection_name: str = SPACE_X) -> Optional[Dict]:
         """
@@ -658,7 +694,13 @@ class SystemManager:
             
             # 检查数据库（如果启用）
             if check_db_first:
-                if self.check_url_exists(current_url, SPACE_X):
+                try:
+                    url_exists = self.check_url_exists(current_url, SPACE_X)
+                except Exception as db_check_err:
+                    print(f"   ⚠️  Database check failed: {db_check_err}, continuing without check...")
+                    url_exists = False
+                
+                if url_exists:
                     print(f"   ⏭️  跳过（数据库中已存在）: {current_url}")
                     count += 1
                     if callback:
