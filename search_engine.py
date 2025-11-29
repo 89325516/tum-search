@@ -4,6 +4,7 @@ import numpy as np
 import random
 import sys
 import os
+import re
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -42,6 +43,98 @@ def gauss_rank_norm(scores):
     if not scores: return []
     ranks = rankdata(scores, method='average')
     return (ranks / len(scores)).tolist()
+
+# --- 辅助函数：生成高亮摘要 ---
+def generate_highlighted_snippet(text: str, query: str, snippet_length: int = 200) -> str:
+    """
+    从文本中提取包含关键词的摘要片段，并用特殊标记包裹关键词以便前端高亮
+    
+    Args:
+        text: 原始文本
+        query: 搜索查询（可能包含多个关键词）
+        snippet_length: 摘要片段的最大长度
+        
+    Returns:
+        包含高亮标记的摘要片段，格式：...前文 [[HIGHLIGHT]]关键词[[/HIGHLIGHT]] 后文...
+    """
+    if not text or not query:
+        return text[:snippet_length] if text else ""
+    
+    text_lower = text.lower()
+    query_lower = query.lower()
+    
+    # 提取查询中的关键词（去除常见停用词）
+    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were'}
+    keywords = [word.strip() for word in re.split(r'[\s,\.;:]+', query_lower) 
+                if word.strip() and word.strip() not in stop_words and len(word.strip()) > 2]
+    
+    if not keywords:
+        keywords = [query_lower]
+    
+    # 查找所有关键词在文本中的位置
+    positions = []
+    for keyword in keywords:
+        # 使用正则表达式进行不区分大小写的搜索
+        pattern = re.escape(keyword)
+        for match in re.finditer(pattern, text_lower, re.IGNORECASE):
+            positions.append((match.start(), match.end(), keyword))
+    
+    # 按位置排序
+    positions.sort(key=lambda x: x[0])
+    
+    if not positions:
+        # 如果没找到关键词，返回文本开头
+        return text[:snippet_length]
+    
+    # 选择第一个匹配位置作为中心（或选择包含最多关键词的区域）
+    center_start, center_end, matched_keyword = positions[0]
+    
+    # 尝试找到一个包含更多关键词的窗口
+    # 计算一个可以包含多个关键词的窗口大小
+    best_start = center_start
+    best_end = min(len(text), center_start + snippet_length)
+    
+    # 尝试向后扩展，看看能否包含更多关键词
+    for pos_start, pos_end, _ in positions[1:]:
+        if pos_end <= center_start + snippet_length:
+            best_end = pos_end + snippet_length // 4  # 扩展一点以包含后面的关键词
+    
+    # 计算摘要的起始位置（向前扩展）
+    snippet_start = max(0, best_start - snippet_length // 2)
+    
+    # 计算摘要的结束位置（向后扩展）
+    snippet_end = min(len(text), best_end + snippet_length // 4)
+    
+    # 如果摘要从文本中间开始，添加省略号
+    prefix = "..." if snippet_start > 0 else ""
+    
+    # 如果摘要未到达文本末尾，添加省略号
+    suffix = "..." if snippet_end < len(text) else ""
+    
+    # 提取摘要片段
+    snippet = text[snippet_start:snippet_end]
+    
+    # 在摘要中高亮所有关键词
+    highlighted_snippet = snippet
+    for keyword in keywords:
+        # 使用正则表达式匹配关键词（不区分大小写）
+        pattern = re.compile(re.escape(keyword), re.IGNORECASE)
+        highlighted_snippet = pattern.sub(
+            lambda m: f"[[HIGHLIGHT]]{m.group()}[[/HIGHLIGHT]]",
+            highlighted_snippet
+        )
+    
+    return prefix + highlighted_snippet + suffix
+
+def extract_keywords_from_query(query: str) -> list:
+    """
+    从查询中提取关键词
+    """
+    # 去除标点符号和常见停用词
+    stop_words = {'the', 'a', 'an', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'is', 'are', 'was', 'were', 'what', 'where', 'when', 'why', 'how'}
+    keywords = [word.strip() for word in re.split(r'[\s,\.;:]+', query.lower()) 
+                if word.strip() and word.strip() not in stop_words and len(word.strip()) > 2]
+    return keywords if keywords else [query.lower()]
 
 # --- 核心搜索函数 ---
 def search(query_text, top_k=10):
@@ -129,12 +222,23 @@ def search(query_text, top_k=10):
         url = p.get('url', '#')
         preview = p.get('content_preview', 'No preview')
         if isinstance(preview, list): preview = preview[0]
+        
+        # 获取完整文本用于生成高亮摘要（优先使用full_text，否则使用content或content_preview）
+        full_text = p.get('full_text', '') or p.get('content', '') or preview
+        
+        # 生成高亮摘要
+        highlighted_snippet = generate_highlighted_snippet(
+            full_text if isinstance(full_text, str) else str(full_text), 
+            query_text, 
+            snippet_length=200
+        )
 
         final_ranked.append({
             "score": final_score,
             "type": content_type,
             "url": url,
             "content": preview,
+            "highlighted_snippet": highlighted_snippet,  # 新增：包含高亮标记的摘要
             "id": item['id'],
             "is_exploration": False
         })

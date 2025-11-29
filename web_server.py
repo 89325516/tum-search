@@ -11,10 +11,18 @@ import asyncio
 from qdrant_client import models
 import argparse
 import sys
+from dotenv import load_dotenv
+
+# 加载环境变量
+load_dotenv()
 
 # 引入核心模块
 from system_manager import SystemManager, SPACE_R, SPACE_X
 from search_engine import search
+from csv_importer import CSVImporter
+
+# 从环境变量读取爬取密码
+CRAWL_PASSWORD = os.getenv("CRAWL_PASSWORD", "")
 
 # 解析命令行参数
 parser = argparse.ArgumentParser(description="TUM Search Engine Server")
@@ -74,8 +82,8 @@ def background_process_content(task_type: str, content: str = None, file_path: s
                     "message": f"Processed: {current_url}"
                 })
             
-            # Run recursive crawl
-            mgr.process_url_recursive(url, max_depth=1, callback=lambda c, u: asyncio.run(progress_callback(c, u)))
+            # Run recursive crawl (启用数据库检查以跳过已存在的URL)
+            mgr.process_url_recursive(url, max_depth=1, callback=lambda c, u: asyncio.run(progress_callback(c, u)), check_db_first=True)
             
             # Get total count
             total_count = mgr.client.count(collection_name=SPACE_X).count
@@ -92,6 +100,9 @@ def background_process_content(task_type: str, content: str = None, file_path: s
             # 清理临时文件
             if os.path.exists(file_path):
                 os.remove(file_path)
+        elif task_type == "csv":
+            # CSV导入已在background_process_csv中处理
+            pass
 
         # 任务完成，准备通知消息
         duration = time.time() - start_time
@@ -123,6 +134,75 @@ def background_process_content(task_type: str, content: str = None, file_path: s
         }))
 
 
+def background_process_csv(file_path: str, url_prefix: str = ""):
+    """
+    后台处理CSV导入任务
+    """
+    start_time = time.time()
+    print(f"⏳ [CSV Import] Starting CSV import from {file_path}")
+    
+    try:
+        importer = CSVImporter(mgr)
+        
+        # 进度回调函数
+        def progress_callback(current: int, total: int, message: str):
+            progress = int((current / total) * 100) if total > 0 else 0
+            asyncio.run(ws_manager.broadcast({
+                "type": "progress",
+                "count": current,
+                "total": total,
+                "message": f"CSV导入进度: {current}/{total} ({progress}%) - {message}"
+            }))
+        
+        # 导入CSV文件
+        stats = importer.import_csv_file(
+            file_path=file_path,
+            batch_size=50,
+            progress_callback=progress_callback,
+            default_url_prefix=url_prefix,
+            promote_novel=True
+        )
+        
+        # 清理临时文件
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        # 发送完成通知
+        duration = time.time() - start_time
+        timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        success_msg = (
+            f"✅ CSV导入完成 ({timestamp})\n"
+            f"总行数: {stats['total']}\n"
+            f"成功导入: {stats['success']}\n"
+            f"失败: {stats['failed']}\n"
+            f"晋升到Space R: {stats['promoted']}\n"
+            f"处理时间: {duration:.2f}秒"
+        )
+        
+        asyncio.run(ws_manager.broadcast({
+            "type": "system_update",
+            "message": success_msg,
+            "timestamp": timestamp
+        }))
+        
+        print(f"✅ [CSV Import] Completed: {stats['success']}/{stats['total']} items imported")
+        
+    except Exception as e:
+        print(f"❌ [CSV Import] Error: {e}")
+        import traceback
+        traceback.print_exc()
+        
+        # 清理临时文件
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        
+        asyncio.run(ws_manager.broadcast({
+            "type": "error",
+            "message": f"CSV导入失败: {str(e)}"
+        }))
+
+
 # ================= 路由定义 =================
 
 # 1. 通用路由 (User & Admin)
@@ -139,6 +219,177 @@ async def websocket_endpoint(websocket: WebSocket):
 async def api_search(q: str):
     results = search(q, top_k=20)
     return {"results": results}
+
+@app.get("/api/search/graph")
+async def api_search_graph(q: str, max_nodes: int = 30):
+    """
+    返回搜索结果的网络图数据
+    构建以查询结果为中心的节点网络图
+    """
+    from search_engine import search
+    from urllib.parse import urlparse
+    
+    # 1. 获取搜索结果
+    search_results = search(q, top_k=min(10, max_nodes // 3))
+    
+    if not search_results:
+        return {"nodes": [], "edges": []}
+    
+    # 2. 构建节点和边的集合
+    nodes_dict = {}  # id -> node data
+    edges_list = []  # List of (source_id, target_id, weight) tuples
+    
+    # 提取节点标题的辅助函数
+    def extract_title(url, content_preview="", node_id=""):
+        if url:
+            # 提取URL路径的最后一部分
+            url_part = url.split('/')[-1].split('?')[0]  # 移除查询参数
+            url_part = url_part.replace('_', ' ').replace('-', ' ')
+            if url_part and url_part != url:
+                title = url_part[:50]
+                return title if len(title) <= 50 else title[:47] + "..."
+        
+        # 如果URL不可用，尝试从内容中提取
+        if content_preview:
+            words = content_preview.split()[:5]  # 取前5个词
+            title = ' '.join(words)[:50]
+            return title if len(title) <= 50 else title[:47] + "..."
+        
+        # 最后使用节点ID
+        return f"Node {node_id[:8]}" if node_id else "Unknown Node"
+    
+    # 3. 为每个搜索结果添加节点，并找到相关节点
+    for result in search_results:
+        result_id = result['id']
+        result_url = result.get('url', '')
+        
+        node_title = extract_title(result_url, result.get('content', ''), result_id)
+        
+        # 添加中心节点（搜索结果）
+        nodes_dict[result_id] = {
+            "id": result_id,
+            "name": node_title,
+            "url": result_url,
+            "content": result.get('content', '')[:100],
+            "score": result.get('score', 0.0),
+            "category": result.get('type', 'unknown'),
+            "value": result.get('score', 0.0) * 100,  # 节点大小
+            "isCenter": True  # 标记为中心节点
+        }
+        
+        # 4. 查找相关节点（通过向量相似度）
+        try:
+            # 从数据库中获取该节点的向量
+            points = mgr.client.retrieve(
+                collection_name=SPACE_X,
+                ids=[result_id],
+                with_vectors=True,
+                with_payload=True
+            )
+            
+            if points:
+                point = points[0]
+                
+                # 查找相似的节点
+                related_hits = mgr.client.query_points(
+                    collection_name=SPACE_X,
+                    query=point.vector['clip'],
+                    using="clip",
+                    limit=5  # 每个中心节点最多5个相关节点
+                ).points
+                
+                for hit in related_hits:
+                    if hit.id == result_id:
+                        continue
+                    
+                    # 限制节点数量
+                    if len(nodes_dict) >= max_nodes:
+                        break
+                    
+                    # 提取相关节点标题
+                    related_url = hit.payload.get('url', '')
+                    related_content = hit.payload.get('content_preview', '')
+                    related_title = extract_title(related_url, related_content, hit.id)
+                    
+                    # 添加相关节点
+                    if hit.id not in nodes_dict:
+                        nodes_dict[hit.id] = {
+                            "id": hit.id,
+                            "name": related_title,
+                            "url": related_url,
+                            "content": hit.payload.get('content_preview', '')[:100],
+                            "score": float(hit.score),
+                            "category": hit.payload.get('type', 'unknown'),
+                            "value": float(hit.score) * 50,  # 相关节点较小
+                            "isCenter": False
+                        }
+                    
+                    # 添加边（中心节点 -> 相关节点）
+                    edge_tuple = (result_id, hit.id, float(hit.score))
+                    if edge_tuple not in edges_list:
+                        edges_list.append(edge_tuple)
+        
+        except Exception as e:
+            print(f"⚠️ Error finding related nodes for {result_id}: {e}")
+        
+        # 5. 查找协作过滤节点（通过transitions）
+        try:
+            top_transitions = mgr.interaction_mgr.get_top_transitions(result_id, limit=3)
+            
+            for target_id, count in top_transitions:
+                if len(nodes_dict) >= max_nodes:
+                    break
+                
+                # 如果节点已存在，只添加边
+                if target_id not in nodes_dict:
+                    try:
+                        target_points = mgr.client.retrieve(
+                            collection_name=SPACE_X,
+                            ids=[target_id],
+                            with_payload=True
+                        )
+                        
+                        if target_points:
+                            target_point = target_points[0]
+                            target_url = target_point.payload.get('url', '')
+                            target_content = target_point.payload.get('content_preview', '')
+                            target_title = extract_title(target_url, target_content, target_id)
+                            
+                            nodes_dict[target_id] = {
+                                "id": target_id,
+                                "name": target_title,
+                                "url": target_url,
+                                "content": target_point.payload.get('content_preview', '')[:100],
+                                "score": 0.5,  # 协作过滤节点中等权重
+                                "category": target_point.payload.get('type', 'unknown'),
+                                "value": 30.0,
+                                "isCenter": False
+                            }
+                    except Exception:
+                        continue
+                
+                # 添加协作边（权重基于transition count）
+                edge_weight = 0.3 + (count * 0.1)  # 基于transition次数
+                edge_tuple = (result_id, target_id, edge_weight)
+                # 检查是否已存在相同的边，如果存在则更新权重
+                existing_edge = next((e for e in edges_list if e[0] == result_id and e[1] == target_id), None)
+                if existing_edge:
+                    edges_list.remove(existing_edge)
+                    edge_weight = max(edge_weight, existing_edge[2])  # 使用较大的权重
+                edges_list.append((result_id, target_id, edge_weight))
+        
+        except Exception as e:
+            print(f"⚠️ Error finding collaborative nodes for {result_id}: {e}")
+    
+    # 6. 转换数据格式
+    nodes = list(nodes_dict.values())
+    edges = [{"source": src, "target": tgt, "value": weight} for src, tgt, weight in edges_list]
+    
+    return {
+        "nodes": nodes,
+        "edges": edges,
+        "query": q
+    }
 
 @app.post("/api/feedback")
 async def api_feedback(item_id: str = Form(...), action: str = Form(...), source_id: str = Form(None)):
@@ -286,7 +537,15 @@ if args.mode == "user":
         return {"status": "started", "message": f"Backfill process started (Force={force})."}
 
     @app.post("/api/upload/url")
-    async def upload_url(url: str = Form(...), background_tasks: BackgroundTasks = None):
+    async def upload_url(url: str = Form(...), password: str = Form(None), background_tasks: BackgroundTasks = None):
+        # 验证密码
+        if not CRAWL_PASSWORD:
+            raise HTTPException(status_code=500, detail="服务器未配置爬取密码，请联系管理员")
+        
+        if not password or password != CRAWL_PASSWORD:
+            raise HTTPException(status_code=403, detail="密码错误，爬取被拒绝")
+        
+        # 密码验证通过，开始处理
         background_tasks.add_task(background_process_content, "url", url=url)
         return {"status": "processing", "message": "URL received. Processing..."}
 
@@ -303,6 +562,34 @@ if args.mode == "user":
             shutil.copyfileobj(file.file, buffer)
         background_tasks.add_task(background_process_content, "image", file_path=file_path)
         return {"status": "processing", "message": "Image received. Processing..."}
+
+    @app.post("/api/upload/csv")
+    async def upload_csv(
+        file: UploadFile = File(...), 
+        password: str = Form(None),
+        url_prefix: str = Form(""),
+        background_tasks: BackgroundTasks = None
+    ):
+        # 验证密码
+        if not CRAWL_PASSWORD:
+            raise HTTPException(status_code=500, detail="服务器未配置爬取密码，请联系管理员")
+        
+        if not password or password != CRAWL_PASSWORD:
+            raise HTTPException(status_code=403, detail="密码错误，CSV导入被拒绝")
+        
+        # 检查文件类型
+        if not file.filename.endswith('.csv'):
+            raise HTTPException(status_code=400, detail="只支持CSV文件格式")
+        
+        # 保存临时文件
+        os.makedirs("temp_uploads", exist_ok=True)
+        file_path = f"temp_uploads/{file.filename}"
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        
+        # 异步处理CSV导入
+        background_tasks.add_task(background_process_csv, file_path=file_path, url_prefix=url_prefix)
+        return {"status": "processing", "message": f"CSV文件已接收，开始批量导入..."}
 
 
 elif args.mode == "admin":

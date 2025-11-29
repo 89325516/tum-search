@@ -2,12 +2,16 @@ import numpy as np
 import uuid
 import time
 import random
+import logging
+from typing import Optional, Dict, List
 from qdrant_client import QdrantClient
 from qdrant_client.http import models
 import google.generativeai as genai
 from transformers import CLIPProcessor, CLIPModel
 from PIL import Image
 from crawler import SmartCrawler  # 确保 crawler.py 在同级目录下
+
+logger = logging.getLogger(__name__)
 
 # ================= 配置区 =================
 # 🔴 你的真实配置
@@ -229,14 +233,27 @@ class SystemManager:
         is_novel = min_dist > NOVELTY_THRESHOLD
         return is_novel, min_dist
 
-    def process_url_and_add(self, url, trigger_recalc=True):
+    def process_url_and_add(self, url, trigger_recalc=True, check_db_first=True):
         """
-        全自动流水线：爬取 -> 清洗(熵) -> 向量化 -> 独特性检测 -> 晋升/入库
+        全自动流水线：检查数据库 -> 爬取（如需要）-> 清洗(熵) -> 向量化 -> 独特性检测 -> 晋升/入库
         Args:
             url: 目标 URL
             trigger_recalc: 是否立即触发全局重算 (批量导入时建议设为 False)
+            check_db_first: 是否先检查数据库，如果存在则跳过爬取
         """
         print(f"\n🤖 Processing URL: {url}")
+        
+        # 0. 检查数据库（如果启用）
+        if check_db_first:
+            if self.check_url_exists(url, SPACE_X):
+                print(f"   ✅ URL已在数据库中，跳过爬取: {url}")
+                # 返回数据库中已有的数据信息
+                existing_data = self.get_url_from_db(url, SPACE_X)
+                if existing_data:
+                    print(f"   📦 使用已有数据 (ID: {existing_data['id'][:8]}...)")
+                    return existing_data
+                else:
+                    print(f"   ⚠️  数据库中存在但无法获取数据，继续爬取")
 
         # 1. 爬取
         data = crawler.parse(url)
@@ -275,12 +292,18 @@ class SystemManager:
                     self.trigger_global_recalculation()
 
             # 无论如何，都要添加到 X (搜索池)
+            payload = {"url": url, "type": "text", "content_preview": text[:100], "pr_score": 0.0}
+            
+            # 如果有链接信息，存储到payload中
+            if 'links' in data and data['links']:
+                payload['links'] = data['links'][:50]  # 存储前50个链接
+            
             client.upsert(
                 collection_name=SPACE_X,
                 points=[models.PointStruct(
                     id=str(uuid.uuid4()),
                     vector={"clip": vec},
-                    payload={"url": url, "type": "text", "content_preview": text[:100], "pr_score": 0.0}
+                    payload=payload
                 )]
             )
 
@@ -289,6 +312,15 @@ class SystemManager:
     def add_to_space_x(self, text, url=None, promote_to_r=False, is_summarized=False, **kwargs):
         """
         添加内容到 Space X (海量信息库)
+        
+        Args:
+            text: 文本内容
+            url: URL地址
+            promote_to_r: 是否强制晋升到Space R
+            is_summarized: 是否已摘要
+            **kwargs: 其他参数，包括:
+                - full_text: 完整原文
+                - links: 链接列表（用于数据库缓存优化）
         """
         if not text: return
         
@@ -308,6 +340,10 @@ class SystemManager:
             "pr_score": 0.0,
             "is_summarized": is_summarized
         }
+        
+        # 如果有链接信息，存储到payload中（用于数据库缓存优化）
+        if 'links' in kwargs and kwargs['links']:
+            payload['links'] = kwargs['links'][:50]  # 存储前50个链接
 
         # 3. 插入到 X
         pt_id = str(uuid.uuid4())
@@ -383,6 +419,91 @@ class SystemManager:
             "items": results,
             "next_offset": next_offset
         }
+
+    def check_url_exists(self, url: str, collection_name: str = SPACE_X) -> bool:
+        """
+        检查URL是否已经在数据库中存在
+        
+        Args:
+            url: 要检查的URL
+            collection_name: 要查询的集合名称（默认SPACE_X）
+            
+        Returns:
+            bool: 如果URL存在返回True，否则返回False
+        """
+        try:
+            points, _ = self.client.scroll(
+                collection_name=collection_name,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="url",
+                            match=models.MatchValue(value=url)
+                        )
+                    ]
+                ),
+                limit=1
+            )
+            return len(points) > 0
+        except Exception as e:
+            print(f"⚠️ Error checking URL existence: {e}")
+            return False
+    
+    def get_url_from_db(self, url: str, collection_name: str = SPACE_X) -> Optional[Dict]:
+        """
+        从数据库获取URL的数据（如果存在）
+        
+        Args:
+            url: 要查询的URL
+            collection_name: 要查询的集合名称（默认SPACE_X）
+            
+        Returns:
+            Dict: 包含id和payload的字典，如果不存在返回None
+        """
+        try:
+            points, _ = self.client.scroll(
+                collection_name=collection_name,
+                scroll_filter=models.Filter(
+                    must=[
+                        models.FieldCondition(
+                            key="url",
+                            match=models.MatchValue(value=url)
+                        )
+                    ]
+                ),
+                limit=1,
+                with_payload=True,
+                with_vectors=True
+            )
+            if points:
+                return {
+                    'id': points[0].id,
+                    'payload': points[0].payload,
+                    'vector': points[0].vector
+                }
+            return None
+        except Exception as e:
+            print(f"⚠️ Error getting URL from DB: {e}")
+            return None
+    
+    def batch_check_urls(self, urls: List[str], collection_name: str = SPACE_X) -> Dict[str, bool]:
+        """
+        批量检查多个URL是否存在
+        
+        Args:
+            urls: URL列表
+            collection_name: 要查询的集合名称（默认SPACE_X）
+            
+        Returns:
+            Dict[str, bool]: URL到存在性的映射字典
+        """
+        result = {}
+        
+        # 批量查询以提高效率
+        for url in urls:
+            result[url] = self.check_url_exists(url, collection_name)
+        
+        return result
 
     # [新增] 删除接口 (用于 Admin 面板)
     def delete_item(self, collection_name, point_id):
@@ -497,15 +618,21 @@ class SystemManager:
             
         print(f"✅ Backfill complete. Updated {count} items.")
 
-    def process_url_recursive(self, start_url, max_depth=1, callback=None):
+    def process_url_recursive(self, start_url, max_depth=1, callback=None, check_db_first=True):
         """
         Recursively crawl and process URLs up to max_depth.
         callback(count, url): function to call on successful addition.
+        check_db_first: 是否先检查数据库，如果URL已存在则跳过爬取
         """
         print(f"🕸️ Starting recursive crawl: {start_url} (Depth: {max_depth})")
+        if check_db_first:
+            print(f"   ✅ 已启用数据库检查，将跳过已存在的URL")
         
         visited = set()
-        queue = [(start_url, 0)] # (url, depth)
+        queue = [(start_url, 0)]
+        
+        # 批量检查URL是否存在（用于优化）
+        urls_to_check = [] # (url, depth)
         count = 0
         
         while queue:
@@ -514,6 +641,31 @@ class SystemManager:
             if current_url in visited:
                 continue
             visited.add(current_url)
+            
+            # 检查数据库（如果启用）
+            if check_db_first:
+                if self.check_url_exists(current_url, SPACE_X):
+                    print(f"   ⏭️  跳过（数据库中已存在）: {current_url}")
+                    count += 1
+                    if callback:
+                        callback(count, current_url)
+                    # 尝试从数据库中获取链接信息
+                    if depth < max_depth:
+                        from urllib.parse import urlparse
+                        start_domain = urlparse(start_url).netloc
+                        existing_data = self.get_url_from_db(current_url, SPACE_X)
+                        if existing_data and 'links' in existing_data.get('payload', {}):
+                            # 如果数据库中有链接信息，使用它们
+                            stored_links = existing_data['payload'].get('links', [])
+                            for link in stored_links:
+                                if urlparse(link).netloc == start_domain:
+                                    if link not in visited:
+                                        queue.append((link, depth + 1))
+                            continue  # 跳过爬取，直接使用存储的链接
+                        else:
+                            # 如果没有存储链接，仍然需要爬取以获取链接
+                            # 但可以设置一个标志，只爬取链接，不更新数据库
+                            pass  # 继续爬取
             
             # Process current URL
             try:
@@ -540,7 +692,15 @@ class SystemManager:
                         is_summarized = True
                         print(f"   ✨ API Summarized content for {current_url}")
                     
-                self.add_to_space_x(text=final_content, url=current_url, promote_to_r=False, is_summarized=is_summarized, full_text=raw_content)
+                # 保存数据时也保存链接信息（用于后续优化）
+                self.add_to_space_x(
+                    text=final_content, 
+                    url=current_url, 
+                    promote_to_r=False, 
+                    is_summarized=is_summarized, 
+                    full_text=raw_content,
+                    links=data.get('links', [])  # 传递链接信息
+                )
                 count += 1
                 
                 # Trigger callback
