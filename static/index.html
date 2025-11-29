@@ -1179,14 +1179,20 @@
                         progressToast.classList.remove('translate-y-24', 'opacity-0');
                         
                         // Show indeterminate progress bar while waiting for WebSocket messages
-                        progressBarContainer.classList.add('hidden');
-                        progressBarIndeterminate.classList.remove('hidden');
-                        progressUrl.classList.add('hidden');
+                        if (progressBarContainer) progressBarContainer.classList.add('hidden');
+                        if (progressBarIndeterminate) progressBarIndeterminate.classList.remove('hidden');
+                        if (progressUrl) progressUrl.classList.add('hidden');
                         
-                        progressTitle.textContent = "Starting URL Crawl...";
-                        progressCount.textContent = "0 items";
-                        progressCount.className = "text-xs font-mono text-cyan-400 bg-cyan-500/20 px-2 py-0.5 rounded-full";
-                        progressDetail.textContent = "Initializing crawler and connecting...";
+                        if (progressTitle) progressTitle.textContent = "Starting URL Crawl...";
+                        if (progressCount) {
+                            progressCount.textContent = "0/1000 (0%)";
+                            progressCount.className = "text-xs font-mono text-cyan-400 bg-cyan-500/20 px-2 py-0.5 rounded-full";
+                        }
+                        if (progressDetail) progressDetail.textContent = "Waiting for crawler to start...";
+                        
+                        console.log('Progress bar shown after URL upload');
+                    } else {
+                        console.error('Progress toast element not found!');
                     }
                     
                     showNotification(result.message || "URL injected into the cortex. Processing...");

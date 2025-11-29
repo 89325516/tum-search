@@ -637,6 +637,14 @@ class SystemManager:
         urls_to_check = [] # (url, depth)
         count = 0
         
+        # 如果提供了回调，在开始前调用一次以更新状态
+        if callback:
+            try:
+                callback(0, start_url)
+                print(f"   📢 Initial callback sent")
+            except Exception as e:
+                print(f"   ⚠️  Error in initial callback: {e}")
+        
         while queue:
             # 检查是否达到最大页面数限制
             if max_pages and count >= max_pages:
@@ -676,14 +684,17 @@ class SystemManager:
             # Process current URL
             try:
                 # 1. Crawl
+                print(f"   🔍 Crawling: {current_url}")
                 data = self.crawler.parse(current_url)
                 if not data:
+                    print(f"   ⚠️  No data retrieved from: {current_url}")
                     continue
                     
                 # 2. Add to DB (Space X)
                 # Combine texts for content
                 raw_content = "\n\n".join(data['texts'])
                 if not raw_content:
+                    print(f"   ⚠️  No text content found in: {current_url}")
                     continue
                 
                 # Summarize using API
