@@ -33,6 +33,14 @@ args, unknown = parser.parse_known_args()
 
 app = FastAPI(title=f"TUM Search Engine ({args.mode.upper()})")
 
+# 在应用启动时保存事件循环
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时保存事件循环"""
+    global _global_event_loop
+    _global_event_loop = asyncio.get_event_loop()
+    print(f"✅ [Startup] Event loop saved for WebSocket broadcasting")
+
 # 挂载静态文件 (前端页面)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -62,6 +70,56 @@ class ConnectionManager:
 
 ws_manager = ConnectionManager()
 
+# 全局事件循环引用（用于后台任务）
+_global_event_loop = None
+
+def set_event_loop(loop):
+    """设置全局事件循环（在应用启动时调用）"""
+    global _global_event_loop
+    _global_event_loop = loop
+
+# Helper function to broadcast WebSocket messages from sync context
+def broadcast_sync(message: dict):
+    """从同步上下文广播WebSocket消息（线程安全）"""
+    try:
+        global _global_event_loop
+        
+        # 优先使用全局事件循环（在FastAPI启动时保存的）
+        if _global_event_loop and _global_event_loop.is_running():
+            # 使用线程安全的方式在运行中的事件循环中执行
+            import concurrent.futures
+            try:
+                future = asyncio.run_coroutine_threadsafe(
+                    ws_manager.broadcast(message), 
+                    _global_event_loop
+                )
+                future.result(timeout=2.0)  # 等待最多2秒
+                return
+            except concurrent.futures.TimeoutError:
+                print(f"⚠️ [Broadcast] Timeout sending message: {message.get('type', 'unknown')}")
+            except Exception as e:
+                print(f"⚠️ [Broadcast] Error using global loop: {e}")
+        
+        # 如果没有全局循环，尝试其他方法
+        try:
+            # 尝试获取当前运行中的循环
+            loop = asyncio.get_running_loop()
+            import concurrent.futures
+            future = asyncio.run_coroutine_threadsafe(ws_manager.broadcast(message), loop)
+            future.result(timeout=2.0)
+        except RuntimeError:
+            # 没有运行中的循环，创建新的事件循环
+            new_loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(new_loop)
+            try:
+                new_loop.run_until_complete(ws_manager.broadcast(message))
+            finally:
+                new_loop.close()
+    except Exception as e:
+        print(f"⚠️ [Broadcast Error] Failed to broadcast message: {e}")
+        import traceback
+        traceback.print_exc()
+
 
 # --- 异步后台任务 (耗时操作在这里做) ---
 def background_process_content(task_type: str, content: str = None, file_path: str = None, url: str = None):
@@ -78,20 +136,22 @@ def background_process_content(task_type: str, content: str = None, file_path: s
             current_count = 0
             total_pages = max_pages  # 总数（使用max_pages作为估算）
             
-            # 发送开始消息
-            try:
-                asyncio.run(ws_manager.broadcast({
-                    "type": "progress",
-                    "task_type": "url",
-                    "count": 0,
-                    "total": total_pages,
-                    "percent": 0,
-                    "message": "Starting URL crawl...",
-                    "current_url": url
-                }))
-                print("✅ [URL Task] Initial progress message sent")
-            except Exception as e:
-                print(f"⚠️ [URL Task] Failed to send initial progress: {e}")
+            # 立即发送开始消息（不延迟）
+            print(f"📢 [URL Task] About to send initial progress message...")
+            broadcast_sync({
+                "type": "progress",
+                "task_type": "url",
+                "count": 0,
+                "total": total_pages,
+                "percent": 0,
+                "message": "Starting URL crawl...",
+                "current_url": url
+            })
+            print("✅ [URL Task] Initial progress message sent")
+            
+            # 等待一小段时间，确保消息被发送
+            import time
+            time.sleep(0.1)
             
             # Define callback to send progress via WebSocket
             def progress_callback(count, current_url):
@@ -110,36 +170,28 @@ def background_process_content(task_type: str, content: str = None, file_path: s
                 else:
                     message = f"Processing page {count}/{total_pages}"
                 
-                try:
-                    asyncio.run(ws_manager.broadcast({
-                        "type": "progress",
-                        "task_type": "url",
-                        "count": count,
-                        "total": total_pages,
-                        "percent": min(percent, 100),  # 限制在100%以内
-                        "message": message,
-                        "current_url": display_url
-                    }))
-                    print(f"✅ [URL Task] Progress updated: {count}/{total_pages} ({percent}%) - {display_url[:50]}")
-                except Exception as e:
-                    print(f"⚠️ [URL Task] Failed to send progress update: {e}")
-                    import traceback
-                    traceback.print_exc()
-            
-            # Send "connecting" status update before starting crawl
-            try:
-                asyncio.run(ws_manager.broadcast({
+                broadcast_sync({
                     "type": "progress",
                     "task_type": "url",
-                    "count": 0,
+                    "count": count,
                     "total": total_pages,
-                    "percent": 0,
-                    "message": "Connecting to crawler...",
-                    "current_url": url
-                }))
-                print("✅ [URL Task] Connection status message sent")
-            except Exception as e:
-                print(f"⚠️ [URL Task] Failed to send connection status: {e}")
+                    "percent": min(percent, 100),  # 限制在100%以内
+                    "message": message,
+                    "current_url": display_url
+                })
+                print(f"✅ [URL Task] Progress updated: {count}/{total_pages} ({percent}%) - {display_url[:50]}")
+            
+            # Send "connecting" status update before starting crawl
+            broadcast_sync({
+                "type": "progress",
+                "task_type": "url",
+                "count": 0,
+                "total": total_pages,
+                "percent": 0,
+                "message": "Connecting to crawler...",
+                "current_url": url
+            })
+            print("✅ [URL Task] Connection status message sent")
             
             # Run recursive crawl (启用数据库检查以跳过已存在的URL)
             # 增加爬取深度到8层，支持更深的内容发现，增加页面数量上限
@@ -151,17 +203,14 @@ def background_process_content(task_type: str, content: str = None, file_path: s
             total_count = mgr.client.count(collection_name=SPACE_X).count
             
             # 发送完成消息，显示实际处理的页面数
-            try:
-                asyncio.run(ws_manager.broadcast({
-                    "type": "system_update",
-                    "task_type": "url",
-                    "message": f"✅ URL crawl finished. Processed {processed_count} pages.",
-                    "count": processed_count,
-                    "total": total_count
-                }))
-                print("✅ [URL Task] Completion message sent")
-            except Exception as e:
-                print(f"⚠️ [URL Task] Failed to send completion message: {e}")
+            broadcast_sync({
+                "type": "system_update",
+                "task_type": "url",
+                "message": f"✅ URL crawl finished. Processed {processed_count} pages.",
+                "count": processed_count,
+                "total": total_count
+            })
+            print("✅ [URL Task] Completion message sent")
         elif task_type == "text":
             # 简单文本处理，复用 add_to_space_x
             mgr.add_to_space_x(text=content, url="User Upload", promote_to_r=False)
