@@ -56,6 +56,7 @@ class ConnectionManager:
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
         self.active_connections.append(websocket)
+        print(f"✅ [WebSocket] Connection added. Total connections: {len(self.active_connections)}")
 
     def disconnect(self, websocket: WebSocket):
         self.active_connections.remove(websocket)
@@ -145,20 +146,9 @@ def background_process_content(task_type: str, content: str = None, file_path: s
             current_count = 0
             total_pages = max_pages  # 总数（使用max_pages作为估算）
             
-            # 等待WebSocket连接建立（最多等待3秒）
-            import time
-            max_wait = 3.0
-            wait_interval = 0.1
-            waited = 0.0
-            while len(ws_manager.active_connections) == 0 and waited < max_wait:
-                time.sleep(wait_interval)
-                waited += wait_interval
-                print(f"⏳ [URL Task] Waiting for WebSocket connection... ({waited:.1f}s)")
-            
-            if len(ws_manager.active_connections) == 0:
-                print(f"⚠️ [URL Task] No WebSocket connections after {max_wait}s, proceeding anyway...")
-            else:
-                print(f"✅ [URL Task] WebSocket connection(s) ready: {len(ws_manager.active_connections)}")
+            # 不再等待WebSocket连接，直接开始处理
+            # WebSocket消息会在有连接时发送，没有连接时继续执行
+            print(f"✅ [URL Task] Starting crawl (WebSocket connections: {len(ws_manager.active_connections)})")
             
             # 立即发送开始消息（确保前端收到更新）
             print(f"📢 [URL Task] About to send initial progress message...")
@@ -437,6 +427,14 @@ async def websocket_endpoint(websocket: WebSocket):
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
         print(f"⚠️ [WebSocket] Connection disconnected. Remaining connections: {len(ws_manager.active_connections)}")
+
+@app.get("/api/debug/websocket")
+async def debug_websocket():
+    """调试端点：检查WebSocket连接状态"""
+    return {
+        "active_connections": len(ws_manager.active_connections),
+        "has_event_loop": _global_event_loop is not None and _global_event_loop.is_running() if _global_event_loop else False
+    }
 
 @app.get("/api/search")
 async def api_search(q: str):
@@ -770,16 +768,10 @@ if args.mode == "user":
         
         # 密码验证通过，开始处理
         print(f"📨 [API] Received URL upload request: {url}")
-        print(f"📨 [API] Adding background task for URL processing...")
+        print(f"📨 [API] WebSocket connections: {len(ws_manager.active_connections)}")
         
-        # 确保background_tasks参数不为None
-        if background_tasks is None:
-            raise HTTPException(status_code=500, detail="Background tasks not available")
-        
-        background_tasks.add_task(background_process_content, "url", url=url)
-        print(f"✅ [API] Background task added successfully")
-        
-        # 立即发送一个初始状态消息（如果WebSocket已连接）
+        # 先发送初始消息，确保前端立即收到更新
+        print(f"📨 [API] Sending initial progress message immediately...")
         if len(ws_manager.active_connections) > 0:
             try:
                 await ws_manager.broadcast({
@@ -791,9 +783,35 @@ if args.mode == "user":
                     "message": "URL received, starting crawl...",
                     "current_url": url
                 })
-                print(f"✅ [API] Initial progress message sent via WebSocket")
+                print(f"✅ [API] Initial progress message sent via WebSocket to {len(ws_manager.active_connections)} connections")
             except Exception as e:
                 print(f"⚠️ [API] Failed to send initial progress message: {e}")
+                import traceback
+                traceback.print_exc()
+        else:
+            print(f"⚠️ [API] No WebSocket connections available! Cannot send progress updates.")
+        
+        # 使用独立线程立即启动任务，确保接口立即返回
+        print(f"📨 [API] Starting background task in separate thread...")
+        
+        import threading
+        
+        def run_in_thread():
+            """在线程中运行同步任务"""
+            try:
+                print(f"🚀 [Thread] Background task thread started for URL: {url}")
+                background_process_content("url", url=url)
+                print(f"✅ [Thread] Background task completed")
+            except Exception as e:
+                print(f"❌ [Thread] Background task error: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # 在独立线程中执行，不阻塞接口
+        thread = threading.Thread(target=run_in_thread, daemon=True)
+        thread.start()
+        
+        print(f"✅ [API] Background task thread started (Thread ID: {thread.ident})")
         
         return {"status": "processing", "message": "URL received. Processing..."}
 

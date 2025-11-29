@@ -644,6 +644,16 @@
         // WebSocket connection handlers
         ws.onopen = function() {
             console.log('✅ WebSocket connected successfully');
+            // 连接成功后，立即测试连接状态
+            fetch('/api/debug/websocket')
+                .then(r => r.json())
+                .then(data => {
+                    console.log('📊 WebSocket debug info:', data);
+                    if (data.active_connections === 0) {
+                        console.error('⚠️ WARNING: No active connections reported by server!');
+                    }
+                })
+                .catch(e => console.error('Failed to get debug info:', e));
         };
 
         ws.onerror = function(error) {
